@@ -51,12 +51,7 @@ const openai = new OpenAIApi(new Configuration({
   apiKey: API_KEY
 }))
 
-const systemMessages = [
-  {
-    role: ChatCompletionRequestMessageRoleEnum.System,
-    content: 'You are chatting within a Discord channel'
-  }
-]
+const systemMessages:ChatCompletionRequestMessage[] = []
 
 if (SYSTEM_MESSAGE !== undefined) {
   systemMessages.push({
@@ -89,7 +84,7 @@ const addMessage = async (
   try {
     const messages = conversations.get(groupId)
     if (messages == null) {
-      conversations.set(groupId, systemMessages)
+      conversations.set(groupId, [...systemMessages])
       conversations.get(groupId)?.push(message)
       console.log('Initializing conversation for group: ' + groupId)
       return
@@ -124,7 +119,7 @@ Promise<ChatCompletionRequestMessage[]> => {
     if (messages == null) {
       return []
     }
-    return messages
+    return [...messages]
   } catch (error) {
     console.error(error)
     return []
@@ -287,7 +282,17 @@ client.on(Events.MessageCreate, async (message) => {
         name: client.user.username.replace(/\s/g, '').trim()
       })
       clearInterval(typingInterval)
-      await message.reply(reply)
+      // if the message is too long, split it up into max of 2000
+      // characters per message
+      if (reply.length > 2000) {
+        // split up the messsage into each 2000 character chunks
+        const chunks = reply.match(/[\s\S]{1,2000}/g)
+        for (const chunk of chunks ?? []) {
+          await message.reply(chunk)
+        }
+      } else {
+        await message.reply(reply)
+      }
     } catch (e) {
       console.log(e)
       await message.reply(ERROR_RESPONSE)
