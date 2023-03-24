@@ -14,7 +14,7 @@ dotenv.config()
 
 const API_KEY = process.env.OPENAI_API_KEY
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN
-const LANGUAGE_MODEL = process.env.LANGUAGE_MODE
+const LANGUAGE_MODEL = process.env.LANGUAGE_MODEL
 const SYSTEM_MESSAGE = process.env.SYSTEM_MESSAGE
 const ERROR_RESPONSE = process.env.ERROR_RESPONSE
 const MODERATION_VIOLATION = process.env.MODERATION_VIOLATION_RESPONSE
@@ -113,14 +113,17 @@ client.on(Events.MessageCreate, async (message) => {
 
   if (channelMessages == null) {
     console.log('Channel messages is null, ignoring message: ' +
-      message.content)
+            message.content)
     return
   }
+
+  // get username with all whitespace removed
+  const name = message.author.username.replace(/\s/g, '').trim()
 
   channelMessages.push({
     role: ChatCompletionRequestMessageRoleEnum.User,
     content: message.content,
-    name: message.author.username
+    name
   })
 
   // if we were mentioned, reply with the completion
@@ -146,7 +149,7 @@ client.on(Events.MessageCreate, async (message) => {
 
       if (moderation.data.results.find(result => result.flagged) != null) {
         console.log('Message flagged: ' + message.content +
-          ' Resetting everything...')
+                    ' Resetting everything...')
         await message.reply(MODERATION_VIOLATION)
         messages.set(message.channel.id, systemMessages)
         clearInterval(typingInterval)
@@ -154,7 +157,7 @@ client.on(Events.MessageCreate, async (message) => {
       }
 
       console.log('Generating completion... messages in history: ' +
-        channelMessages.length.toString())
+                channelMessages.length.toString())
 
       const response = await openai.createChatCompletion({
         model: LANGUAGE_MODEL,
@@ -177,7 +180,7 @@ client.on(Events.MessageCreate, async (message) => {
       const firstResponse = response.data.choices[0]
 
       if (firstResponse.message == null ||
-        firstResponse.message.content === '') {
+                firstResponse.message.content === '') {
         console.log('No message returned!')
         await message.reply(ERROR_RESPONSE)
         clearInterval(typingInterval)
