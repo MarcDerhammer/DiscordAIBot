@@ -94,24 +94,22 @@ client.on(Events.MessageCreate, async (message) => {
     messages.set(message.channelId, systemMessages)
   }
 
-  const channelMessages = messages.get(message.channelId)
-
   // if our messages are too long, remove oldest ones until we're
   // under the MAX_TOKENS_IN_MESSAGES
   // ignore System messages in this calculation
-  let totalTokens = channelMessages?.filter(
+  let totalTokens = messages.get(message.channelId)?.filter(
     (message) => message.role !== ChatCompletionRequestMessageRoleEnum.System)
     .map((message) => encode(message.content).length)
     .reduce((a, b) => a + b, 0) ?? 0
   while (totalTokens > MAX_TOKENS_IN_MESSAGES) {
-    channelMessages?.shift()
-    totalTokens = channelMessages?.filter(
+    messages.get(message.channelId)?.shift()
+    totalTokens = messages.get(message.channelId)?.filter(
       (message) => message.role !== ChatCompletionRequestMessageRoleEnum.System)
       .map((message) =>
         encode(message.content).length).reduce((a, b) => a + b, 0) ?? 0
   }
 
-  if (channelMessages == null) {
+  if (messages.get(message.channelId) == null) {
     console.log('Channel messages is null, ignoring message: ' +
             message.content)
     return
@@ -120,7 +118,7 @@ client.on(Events.MessageCreate, async (message) => {
   // get username with all whitespace removed
   const name = message.author.username.replace(/\s/g, '').trim()
 
-  channelMessages.push({
+  messages.get(message.channelId)?.push({
     role: ChatCompletionRequestMessageRoleEnum.User,
     content: message.content,
     name
@@ -141,27 +139,37 @@ client.on(Events.MessageCreate, async (message) => {
 
     try {
       console.log('Checking moderation...')
+
+      if (messages.get(message.channelId) == null) {
+        console.log('Channel messages is null, ignoring message: ' +
+                message.content)
+        return
+      }
+
       // ensure the message is appropriate
       const moderation = await openai.createModeration({
-        input: channelMessages.map((message) =>
-          message.content)
+        input: messages.get(message.channelId)?.map((message) =>
+          message.content) ?? []
       })
+
+      console.log(moderation.data.results)
 
       if (moderation.data.results.find(result => result.flagged) != null) {
         console.log('Message flagged: ' + message.content +
                     ' Resetting everything...')
         await message.reply(MODERATION_VIOLATION)
-        messages.set(message.channel.id, systemMessages)
+        console.log(JSON.stringify(messages.get(message.channelId)))
+        console.log(messages.delete(message.channelId))
+        console.log(JSON.stringify(messages.get(message.channelId)))
         clearInterval(typingInterval)
         return
       }
 
-      console.log('Generating completion... messages in history: ' +
-                channelMessages.length.toString())
+      console.log('Generating completion... messages in history')
 
       const response = await openai.createChatCompletion({
         model: LANGUAGE_MODEL,
-        messages: channelMessages,
+        messages: messages.get(message.channelId) ?? [],
         user: message.author.id
       })
 
@@ -197,20 +205,22 @@ client.on(Events.MessageCreate, async (message) => {
 
       const reply = firstResponse.message.content
 
-      // let's make sure our own response isn't flagged
-      const moderation2 = await openai.createModeration({
-        input: [reply]
-      })
+      // // let's make sure our own response isn't flagged
+      // const moderation2 = await openai.createModeration({
+      //   input: [reply]
+      // })
 
-      if (moderation2.data.results.find(result => result.flagged) != null) {
-        console.log('Reply flagged: ' + reply + ' Resetting everything...')
-        await message.reply(MODERATION_VIOLATION)
-        messages.set(message.channel.id, systemMessages)
-        clearInterval(typingInterval)
-        return
-      }
+      // if (moderation2.data.results.find(result => result.flagged) != null) {
+      //   console.log('Reply flagged: ' + reply + ' Resetting everything...')
+      //   await message.reply(MODERATION_VIOLATION)
+      //   // messages.set(message.channel.id, systemMessages)
+      //   messages.delete(message.channelId)
+      //   console.log(JSON.stringify(messages.get(message.channelId)))
+      //   clearInterval(typingInterval)
+      //   return
+      // }
 
-      channelMessages.push({
+      messages.get(message.channelId)?.push({
         role: ChatCompletionRequestMessageRoleEnum.Assistant,
         content: reply
       })
