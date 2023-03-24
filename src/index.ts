@@ -10,6 +10,7 @@ import { Client, Events, GatewayIntentBits } from 'discord.js'
 import { encode } from 'gpt-3-encoder'
 
 import dotenv from 'dotenv'
+import { Mutex } from './mutex'
 dotenv.config()
 
 const API_KEY = process.env.OPENAI_API_KEY
@@ -76,9 +77,91 @@ client.once(Events.ClientReady, () => {
        ${systemMessages.map((message) => message.content).join(', ')}`)
 })
 
-// create a hashmap of messages to represent the conversation ongoings for
-// each channel. the key will be the channel id
-const messages = new Map<string, ChatCompletionRequestMessage[]>()
+// create a mutex containing the server messages
+const conversationMutex = new Mutex()
+const conversations = new Map<string, ChatCompletionRequestMessage[]>()
+
+const addMessage = async (
+  groupId: string, message: ChatCompletionRequestMessage
+): Promise<void> => {
+  const unlock = await conversationMutex.lock()
+
+  try {
+    const messages = conversations.get(groupId)
+    if (messages == null) {
+      conversations.set(groupId, systemMessages)
+      conversations.get(groupId)?.push(message)
+      console.log('Initializing conversation for group: ' + groupId)
+      return
+    }
+    messages.push(message)
+  } catch (error) {
+    console.error(error)
+  } finally {
+    unlock()
+  }
+}
+
+const clearMessages = async (groupId: string): Promise<void> => {
+  const unlock = await conversationMutex.lock()
+
+  try {
+    console.log('Clearing conversation for group: ' + groupId)
+    conversations.delete(groupId)
+  } catch (error) {
+    console.error(error)
+  } finally {
+    unlock()
+  }
+}
+
+const getMessages = async (groupId: string):
+Promise<ChatCompletionRequestMessage[]> => {
+  const unlock = await conversationMutex.lock()
+
+  try {
+    const messages = conversations.get(groupId)
+    if (messages == null) {
+      return []
+    }
+    return messages
+  } catch (error) {
+    console.error(error)
+    return []
+  } finally {
+    unlock()
+  }
+}
+
+const removeOldestNonSystemMessage = async (
+  groupId: string
+): Promise<void> => {
+  const unlock = await conversationMutex.lock()
+  try {
+    const messages = conversations.get(groupId)
+    if (messages == null) {
+      return
+    }
+
+    const index = messages.findIndex(
+      (message) => message.role !== ChatCompletionRequestMessageRoleEnum.System
+    )
+    if (index !== -1) {
+      messages.splice(index, 1)
+    }
+  } catch (error) {
+    console.error(error)
+  } finally {
+    unlock()
+  }
+}
+
+const countTokens = async (channelId: string): Promise<number> => {
+  return (await getMessages(channelId)).filter(
+    (message) => message.role !== ChatCompletionRequestMessageRoleEnum.System)
+    .map((message) => encode(message.content).length)
+    .reduce((a, b) => a + b, 0) ?? 0
+}
 
 client.on(Events.MessageCreate, async (message) => {
   if ((client.user?.id) == null || message.channelId == null) {
@@ -89,40 +172,35 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.author.id === client.user.id) {
     return
   }
-  // add the message to the conversation
-  if (!messages.has(message.channelId)) {
-    messages.set(message.channelId, systemMessages)
-  }
 
   // if our messages are too long, remove oldest ones until we're
   // under the MAX_TOKENS_IN_MESSAGES
   // ignore System messages in this calculation
-  let totalTokens = messages.get(message.channelId)?.filter(
-    (message) => message.role !== ChatCompletionRequestMessageRoleEnum.System)
-    .map((message) => encode(message.content).length)
-    .reduce((a, b) => a + b, 0) ?? 0
+  let totalTokens = await countTokens(message.channelId)
   while (totalTokens > MAX_TOKENS_IN_MESSAGES) {
-    messages.get(message.channelId)?.shift()
-    totalTokens = messages.get(message.channelId)?.filter(
-      (message) => message.role !== ChatCompletionRequestMessageRoleEnum.System)
-      .map((message) =>
-        encode(message.content).length).reduce((a, b) => a + b, 0) ?? 0
+    console.log('Removing oldest message to make room for new message: ')
+    await removeOldestNonSystemMessage(message.channelId)
+    totalTokens = await countTokens(message.channelId)
+    console.log(`Total tokens: ${totalTokens}`)
   }
 
-  if (messages.get(message.channelId) == null) {
+  if ((await getMessages(message.channelId)) == null) {
     console.log('Channel messages is null, ignoring message: ' +
-            message.content)
+      message.content)
     return
   }
 
   // get username with all whitespace removed
   const name = message.author.username.replace(/\s/g, '').trim()
 
-  messages.get(message.channelId)?.push({
+  await addMessage(message.channelId, {
     role: ChatCompletionRequestMessageRoleEnum.User,
     content: message.content,
     name
   })
+
+  const existingMessages = await getMessages(message.channelId)
+  console.log('Existing messages: ' + existingMessages.length.toString())
 
   // if we were mentioned, reply with the completion
   if (message.mentions.has(client.user)) {
@@ -140,28 +218,25 @@ client.on(Events.MessageCreate, async (message) => {
     try {
       console.log('Checking moderation...')
 
-      if (messages.get(message.channelId) == null) {
-        console.log('Channel messages is null, ignoring message: ' +
-                message.content)
-        return
-      }
+      const messages = await getMessages(message.channelId)
+
+      console.log(messages?.map((message) =>
+        message.content) ?? [])
 
       // ensure the message is appropriate
       const moderation = await openai.createModeration({
-        input: messages.get(message.channelId)?.map((message) =>
+        input: messages?.map((message) =>
           message.content) ?? []
       })
 
-      console.log(moderation.data.results)
-
       if (moderation.data.results.find(result => result.flagged) != null) {
         console.log('Message flagged: ' + message.content +
-                    ' Resetting everything...')
-        await message.reply(MODERATION_VIOLATION)
-        console.log(JSON.stringify(messages.get(message.channelId)))
-        console.log(messages.delete(message.channelId))
-        console.log(JSON.stringify(messages.get(message.channelId)))
+          ' Resetting everything...')
+        await clearMessages(message.channelId)
         clearInterval(typingInterval)
+        await message.reply(MODERATION_VIOLATION)
+        const messages = await getMessages(message.channelId)
+        console.log(messages.length)
         return
       }
 
@@ -169,7 +244,7 @@ client.on(Events.MessageCreate, async (message) => {
 
       const response = await openai.createChatCompletion({
         model: LANGUAGE_MODEL,
-        messages: messages.get(message.channelId) ?? [],
+        messages: messages ?? [],
         user: message.author.id
       })
 
@@ -188,7 +263,7 @@ client.on(Events.MessageCreate, async (message) => {
       const firstResponse = response.data.choices[0]
 
       if (firstResponse.message == null ||
-                firstResponse.message.content === '') {
+        firstResponse.message.content === '') {
         console.log('No message returned!')
         await message.reply(ERROR_RESPONSE)
         clearInterval(typingInterval)
@@ -205,24 +280,11 @@ client.on(Events.MessageCreate, async (message) => {
 
       const reply = firstResponse.message.content
 
-      // // let's make sure our own response isn't flagged
-      // const moderation2 = await openai.createModeration({
-      //   input: [reply]
-      // })
-
-      // if (moderation2.data.results.find(result => result.flagged) != null) {
-      //   console.log('Reply flagged: ' + reply + ' Resetting everything...')
-      //   await message.reply(MODERATION_VIOLATION)
-      //   // messages.set(message.channel.id, systemMessages)
-      //   messages.delete(message.channelId)
-      //   console.log(JSON.stringify(messages.get(message.channelId)))
-      //   clearInterval(typingInterval)
-      //   return
-      // }
-
-      messages.get(message.channelId)?.push({
+      await addMessage(message.channelId, {
         role: ChatCompletionRequestMessageRoleEnum.Assistant,
-        content: reply
+        content: reply,
+        // remove whitespace from username
+        name: client.user.username.replace(/\s/g, '').trim()
       })
       clearInterval(typingInterval)
       await message.reply(reply)
