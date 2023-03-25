@@ -1,6 +1,6 @@
 {
   "name": "typescript-node-template",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "index.js",
   "license": "MIT",
   "devDependencies": {
@@ -20,7 +20,8 @@
     "build": "tsc",
     "start": "tsc && node dist/src/index.js",
     "test": "jest",
-    "lint": "eslint src/**/*.ts"
+    "lint": "eslint src/**/*.ts",
+    "docker-build": "docker buildx build --platform linux/amd -t mobatome/discordai:$1 ."
   },
   "dependencies": {
     "discord.js": "^14.8.0",
