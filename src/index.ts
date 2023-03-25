@@ -24,6 +24,8 @@ const CHANNEL_IDS = getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
   : getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
 
 const MAX_TOKENS_IN_MESSAGES = LANGUAGE_MODEL === 'gpt-3.5-turbo' ? 4096 : 2048
+const ONLY_RESPOND_TO_MENTIONS = getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase() === 'true' ||
+  getEnv('ONLY_RESPOND_TO_MENTIONS') === ''
 
 const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
