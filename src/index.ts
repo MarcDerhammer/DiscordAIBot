@@ -22,7 +22,9 @@ const BOT_IMAGE_URL = getEnv('BOT_IMAGE_URL')
 const ONLY_RESPOND_TO_MENTIONS = getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase() === 'true' ||
   getEnv('ONLY_RESPOND_TO_MENTIONS') === ''
 
-const CHANNEL_IDS = getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
+const CHANNEL_IDS = getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
+  ? []
+  : getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
 
 const MAX_TOKENS_IN_MESSAGES = LANGUAGE_MODEL === 'gpt-3.5-turbo' ? 4096 : 2048
 
@@ -65,6 +67,7 @@ const countTokens = async (channelId: string): Promise<number> => {
 
 client.on(Events.MessageCreate, async (message) => {
   if (client.user?.id == null || message.channelId == null) {
+    console.log('Client user or channel id is null, ignoring message')
     return
   }
 
@@ -72,11 +75,13 @@ client.on(Events.MessageCreate, async (message) => {
     CHANNEL_IDS.length > 0 &&
     !CHANNEL_IDS.includes(message.channelId.toString())
   ) {
+    console.log('Channel not in list, ignoring')
     return
   }
 
   // ignore our own messages
   if (message.author.id === client.user.id) {
+    console.log('Ignoring our own message')
     return
   }
 

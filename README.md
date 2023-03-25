@@ -22,7 +22,7 @@ To get started with the Discord AI Bot, you need to set up a few environment var
 - `DISCORD_TOKEN`: Your Discord Bot token, required for the bot to function within your server.
 - `LANGUAGE_MODEL`: The OpenAI language model you wish to use, such as `gpt-3.5-turbo`.
 - `ERROR_RESPONSE`: The message the bot will send when there's an error in processing the user's input.
-- `SYSTEM_MESSAGE`: The initial prompt to use with the bot, sent as a "system" message.
+- `SYSTEM_MESSAGE`: The initial prompt to use with the bot, sent as a "system" message. Example: "You are the Master Chief from Halo. Stay in character as much as possible"
 - `MODERATION_VIOLATION_RESPONSE`: The message the bot will send when a user's input violates OpenAI's moderation policy.
 
 ### Optional
