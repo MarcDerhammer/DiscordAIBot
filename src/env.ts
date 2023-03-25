@@ -15,6 +15,8 @@ interface RequiredEnv {
 interface OptionalEnv {
   BOT_NAME?: string
   BOT_IMAGE_URL?: string
+  ONLY_RESPOND_TO_MENTIONS?: string
+  ONLY_RESPOND_IN_CHANNEL?: string
 }
 
 type Env = RequiredEnv & OptionalEnv
@@ -27,7 +29,9 @@ const env: EnvConfig = {
   MODERATION_VIOLATION: process.env.MODERATION_VIOLATION_RESPONSE,
   SYSTEM_MESSAGE: process.env.SYSTEM_MESSAGE,
   BOT_NAME: process.env.BOT_NAME,
-  BOT_IMAGE_URL: process.env.BOT_IMAGE_URL
+  BOT_IMAGE_URL: process.env.BOT_IMAGE_URL,
+  ONLY_RESPOND_TO_MENTIONS: process.env.ONLY_RESPOND_TO_MENTIONS,
+  ONLY_RESPOND_IN_CHANNEL: process.env.ONLY_RESPOND_IN_CHANNEL
 }
 
 function isRequiredEnv (key: keyof Env): key is keyof RequiredEnv {
