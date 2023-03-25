@@ -10,18 +10,20 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    container:
+      image: node:18-alpine
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Setup Node.js environment
-        uses: actions/setup-node@v2
-        with:
-          node-version: '18.x'
+      - name: Update package version
+        run: |
+          npm install
+          npm version --no-git-tag-version ${{ inputs.version }}
 
-      - name: Install dependencies
-        run: npm install
+      - name: Prune development dependencies
+        run: npm prune --production
 
       - name: Login to Docker Hub
         uses: docker/login-action@v1
@@ -59,3 +61,7 @@ jobs:
           base: 'main'
           head: 'release/${{ inputs.version }}'
           draft: false
+          
+      - name: Cleanup
+        run: |
+          npm prune --production
