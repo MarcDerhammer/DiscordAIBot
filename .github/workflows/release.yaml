@@ -17,9 +17,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Install and setup Docker
-        uses: docker/setup-docker@v1
-
       - name: Update package version
         run: |
           npm install
@@ -29,15 +26,14 @@ jobs:
         run: npm prune --production
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
-          context: .
           push: true
           tags: mobatome/discordai:${{ inputs.version }}
 
