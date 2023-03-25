@@ -14,12 +14,11 @@ jobs:
       image: node:18-alpine
 
     steps:
-      - name: Install Docker
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-ce
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Install and setup Docker
+        uses: docker/setup-docker@v1
 
       - name: Update package version
         run: |
