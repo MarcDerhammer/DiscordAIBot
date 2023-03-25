@@ -40,8 +40,9 @@ const client = new Client({
 })
 
 client.once(Events.ClientReady, () => {
-  console.log(`Ready!  Using model: ${LANGUAGE_MODEL} and system message 
-       ${systemMessages.map((message) => message.content).join(', ')}`)
+  console.log(
+    `Ready!  Using model: ${LANGUAGE_MODEL} and system message ` +
+    `${systemMessages.map((message) => message.content).join(', ')}`)
 })
 
 const messages = new Messages(systemMessages)
@@ -52,6 +53,10 @@ const countTokens = async (channelId: string): Promise<number> => {
 
 client.on(Events.MessageCreate, async (message) => {
   if ((client.user?.id) == null || message.channelId == null) {
+    return
+  }
+  // also ignore @everyone or role mentions
+  if (message.mentions.everyone || message.mentions.roles.size > 0) {
     return
   }
 
@@ -141,6 +146,8 @@ client.on(Events.MessageCreate, async (message) => {
       // remove whitespace from username
       name: client.user.username.replace(/\s/g, '').trim()
     })
+
+    console.log('Response: ' + response)
     // if the message is too long, split it up into max of 2000
     // characters per message
     // split up the messsage into each 2000 character chunks
