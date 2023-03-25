@@ -32,7 +32,6 @@ const env: EnvConfig = {
   BOT_IMAGE_URL: process.env.BOT_IMAGE_URL,
   ONLY_RESPOND_TO_MENTIONS: process.env.ONLY_RESPOND_TO_MENTIONS,
   ONLY_RESPOND_IN_CHANNEL: process.env.ONLY_RESPOND_IN_CHANNEL
-  BOT_IMAGE_URL: process.env.BOT_IMAGE_URL
 }
 
 function isRequiredEnv (key: keyof Env): key is keyof RequiredEnv {
