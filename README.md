@@ -18,7 +18,7 @@ To get started with the Discord AI Bot, you need to set up a few environment var
 
 ### Required
 
-- `OPENAI_API_KEY`: Your API key for OpenAI, used to authenticate with the OpenAI API.
+- `OPENAI_API_KEY`: Your API key for OpenAI, used to authenticate with the OpenAI API. [More info](https://openai.com/blog/openai-api)
 - `DISCORD_TOKEN`: Your Discord Bot token, required for the bot to function within your server.
 - `LANGUAGE_MODEL`: The OpenAI language model you wish to use, such as `gpt-3.5-turbo`.
 - `ERROR_RESPONSE`: The message the bot will send when there's an error in processing the user's input.
@@ -97,6 +97,12 @@ mobatome/discordai
 3. Set up your environment variables based on the configuration options mentioned above.
 4. Run the bot.
 5. Invite the bot to your Discord server using the URL generated in the Discord Developer Portal and enjoy the AI-driven responses!
+
+## Memory and Token Limit
+
+The OpenAI language models, such as GPT-3.5-turbo, have a token limit that affects the amount of text they can process in a single API call. The token limit for GPT-3.5-turbo is 4096 tokens. Each token can represent a single character or a few characters, such as a word or a punctuation mark.
+
+Due to this token limit, the bot will only remember the most recent messages up to the model's token limit. If the conversation history exceeds this limit, the bot may not be able to remember or respond to older messages appropriately. Keep in mind that very long conversations might also result in incomplete or truncated responses from the bot.
 
 ## License
 
