@@ -60,6 +60,11 @@ client.on(Events.MessageCreate, async (message) => {
     return
   }
 
+  // also ignore all bots.. we don't want to get into a loop
+  if (message.author.bot) {
+    return
+  }
+
   // ignore our own messages
   if (message.author.id === client.user.id) {
     return
