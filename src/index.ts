@@ -8,7 +8,7 @@ import {
 import { Client, Events, GatewayIntentBits } from 'discord.js'
 import { encode } from 'gpt-3-encoder'
 import { getEnv } from './env'
-import { Messages } from './messages'
+import { Messages } from './Messages'
 import { OpenAiHelper } from './OpenAiHelper'
 
 const API_KEY = getEnv('API_KEY')
