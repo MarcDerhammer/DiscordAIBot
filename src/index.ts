@@ -169,6 +169,11 @@ client.on(Events.MessageCreate, async (message) => {
   }
 })
 
+// every 10 minutes, set our status to online
+setInterval(() => {
+  client.user?.setStatus('online')
+}, 10 * 60 * 1000)
+
 // let's begin!
 client.login(DISCORD_TOKEN).then(() => {
   console.log('Logged in!')
