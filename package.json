@@ -1,6 +1,7 @@
 {
   "name": "typescript-node-template",
-  "version": "1.0.4",
+  "version": "1.0.5",
+  "author": "Marc Derhammer",
   "main": "index.js",
   "license": "MIT",
   "devDependencies": {

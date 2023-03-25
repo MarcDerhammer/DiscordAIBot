@@ -1,0 +1,40 @@
+name: Create Tag on Merge
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  create_tag_on_merge:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Create tag
+        run: |
+          RELEASE_NAME=${{ github.event.pull_request.head.ref }}
+          TAG_NAME=${RELEASE_NAME/release\//}
+          git tag $TAG_NAME
+
+      - name: Push tag
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tags: true
+ 
+      - name: Merge release into develop branch
+        uses: thomaseizinger/create-pull-request@1.0.0
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          head: ${{ github.event.pull_request.head.ref }}
+          base: develop
+          title: Merge release ${{ env.RELEASE_VERSION }} into develop branch
+          body: |
+            This PR merges the release branch for ${{ env.RELEASE_VERSION }} back into develop.
+            This happens to ensure that the updates that happend on the release branch, i.e. CHANGELOG and manifest updates are also present on the dev branch.

@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The version number for the release'
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18.x'
+
+      - name: Initialize mandatory git config
+        run: |
+          git config user.name "GitHub actions"
+          git config user.email noreply@github.com
+
+      - name: Update package version
+        run: |
+          yarn
+          npm version --no-git-tag-version ${{ inputs.version }}
+
+      - name: Commit the changes
+        id: make-commit
+        run: |
+          git add package.json
+          git commit --message "Prepare release ${{ inputs.version }}"
+
+      - name: Prune development dependencies
+        run: npm prune --production
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          tags: mobatome/discordai:${{ inputs.version }}
+
+      - name: Create release branch
+        run: |
+          RELEASE_NAME=${{ inputs.version }}
+          git checkout develop
+          git checkout -b release/$RELEASE_NAME
+      
+      - name: Push release branch
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: release/${{ inputs.version }}
+
+      - name: Create PR to master
+        uses: thomaseizinger/create-pull-request@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          head: release/${{ inputs.version }}
+          base: main
+          title: Merge release/${{ inputs.version }} into main
+          body: |
+            This PR was created automatically by the GitHub Action, **Release**. 
+            Merging this should create a new tagged release on Main
+          
+      - name: Cleanup
+        run: |
+          npm prune --production
