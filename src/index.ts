@@ -17,6 +17,8 @@ const LANGUAGE_MODEL = getEnv('LANGUAGE_MODEL')
 const ERROR_RESPONSE = getEnv('ERROR_RESPONSE')
 const MODERATION_VIOLATION = getEnv('MODERATION_VIOLATION')
 const SYSTEM_MESSAGE = getEnv('SYSTEM_MESSAGE')
+const BOT_NAME = getEnv('BOT_NAME')
+const BOT_IMAGE_URL = getEnv('BOT_IMAGE_URL')
 
 const MAX_TOKENS_IN_MESSAGES = LANGUAGE_MODEL === 'gpt-3.5-turbo' ? 4096 : 2048
 
@@ -24,35 +26,41 @@ const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
     new Configuration({
       apiKey: API_KEY
-    })),
-  LANGUAGE_MODEL)
+    })
+  ),
+  LANGUAGE_MODEL
+)
 
-const systemMessages: ChatCompletionRequestMessage[] = [{
-  role: ChatCompletionRequestMessageRoleEnum.System,
-  content: SYSTEM_MESSAGE
-}]
+const systemMessages: ChatCompletionRequestMessage[] = [
+  {
+    role: ChatCompletionRequestMessageRoleEnum.System,
+    content: SYSTEM_MESSAGE
+  }
+]
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent]
+    GatewayIntentBits.MessageContent
+  ]
 })
 
 client.once(Events.ClientReady, () => {
   console.log(
     `Ready!  Using model: ${LANGUAGE_MODEL} and system message ` +
-    `${systemMessages.map((message) => message.content).join(', ')}`)
+      `${systemMessages.map((message) => message.content).join(', ')}`
+  )
 })
 
 const messages = new Messages(systemMessages)
 
 const countTokens = async (channelId: string): Promise<number> => {
-  return encode(JSON.stringify((await messages.getMessages(channelId)))).length
+  return encode(JSON.stringify(await messages.getMessages(channelId))).length
 }
 
 client.on(Events.MessageCreate, async (message) => {
-  if ((client.user?.id) == null || message.channelId == null) {
+  if (client.user?.id == null || message.channelId == null) {
     return
   }
 
@@ -62,8 +70,9 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   if ((await messages.getMessages(message.channelId)) == null) {
-    console.log('Channel messages is null, ignoring message: ' +
-      message.content)
+    console.log(
+      'Channel messages is null, ignoring message: ' + message.content
+    )
     return
   }
 
@@ -97,11 +106,14 @@ client.on(Events.MessageCreate, async (message) => {
   await message.channel.sendTyping()
   // continulously send typing while waiting for the completion
   const typingInterval = setInterval(() => {
-    message.channel.sendTyping().then(() => {
-      console.log('Sent typing...')
-    }).catch(() => {
-      console.error('Error sending typing')
-    })
+    message.channel
+      .sendTyping()
+      .then(() => {
+        console.log('Sent typing...')
+      })
+      .catch(() => {
+        console.error('Error sending typing')
+      })
   }, 5000)
 
   try {
@@ -109,8 +121,7 @@ client.on(Events.MessageCreate, async (message) => {
 
     const currentMessages = await messages.getMessages(message.channelId)
 
-    console.log(currentMessages?.map((message) =>
-      message.content) ?? [])
+    console.log(currentMessages?.map((message) => message.content) ?? [])
 
     // ensure the message is appropriate
     const inappropriate = await openAiHelper.areMessagesInappropriate(
@@ -138,8 +149,11 @@ client.on(Events.MessageCreate, async (message) => {
       console.log(`Total tokens: ${totalTokens}`)
     }
 
-    console.log(`Generating completion using ${(await countTokens(message.channelId))
-      .toString()} tokens`)
+    console.log(
+      `Generating completion using ${(
+        await countTokens(message.channelId)
+      ).toString()} tokens`
+    )
 
     const response = await openAiHelper.createChatCompletion(
       currentMessages ?? [],
@@ -175,8 +189,23 @@ setInterval(() => {
 }, 10 * 60 * 1000)
 
 // let's begin!
-client.login(DISCORD_TOKEN).then(() => {
-  console.log('Logged in!')
-}).catch((e) => {
-  console.error(e)
-})
+client
+  .login(DISCORD_TOKEN)
+  .then(async () => {
+    console.log('Logged in!')
+    // set the name and image (if defined)
+    // and if the name is not the same as the current name, change it
+    if (BOT_NAME.length > 0 && BOT_NAME !== client.user?.username) {
+      console.log('Setting bot name to: ' + BOT_NAME)
+      await client.user?.edit({ username: BOT_NAME })
+    }
+
+    // do the same for the bot image
+    if (BOT_IMAGE_URL.length > 0 && BOT_IMAGE_URL !== client.user?.avatar) {
+      console.log('Setting bot image to: ' + BOT_IMAGE_URL)
+      await client.user?.setAvatar(BOT_IMAGE_URL)
+    }
+  })
+  .catch((e) => {
+    console.error(e)
+  })
