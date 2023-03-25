@@ -33,7 +33,7 @@ jobs:
         uses: thomaseizinger/create-pull-request@1.0.0
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          head: ${{ github.event.pull_request.head.ref }}
+          head: main
           base: develop
           title: Merge release ${{ env.RELEASE_VERSION }} into develop branch
           body: |
