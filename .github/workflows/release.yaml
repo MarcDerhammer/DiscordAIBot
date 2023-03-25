@@ -49,7 +49,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           push: true
-          tags: mobatome/discordai:${{ inputs.version }}
+          tags: mobatome/discordai:${{ inputs.version }},mobatome/discordai:latest
 
       - name: Create release branch
         run: |
