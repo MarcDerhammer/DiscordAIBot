@@ -21,7 +21,7 @@
     "start": "tsc && node dist/src/index.js",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
-    "docker-build": "docker buildx build --platform linux/amd -t mobatome/discordai:$1 ."
+    "docker-build": "./dockerBuild.sh"
   },
   "dependencies": {
     "discord.js": "^14.8.0",

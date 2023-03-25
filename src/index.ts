@@ -55,15 +55,6 @@ client.on(Events.MessageCreate, async (message) => {
   if ((client.user?.id) == null || message.channelId == null) {
     return
   }
-  // also ignore @everyone or role mentions
-  if (message.mentions.everyone || message.mentions.roles.size > 0) {
-    return
-  }
-
-  // also ignore all bots.. we don't want to get into a loop
-  if (message.author.bot) {
-    return
-  }
 
   // ignore our own messages
   if (message.author.id === client.user.id) {
@@ -81,6 +72,16 @@ client.on(Events.MessageCreate, async (message) => {
     content: message.content,
     name: message.author.username.replace(/\s/g, '').trim() // need to remove whitespace.. it breaks
   })
+
+  // also ignore @everyone or role mentions
+  if (message.mentions.everyone || message.mentions.roles.size > 0) {
+    return
+  }
+
+  // also ignore all bots.. we don't want to get into a loop
+  if (message.author.bot) {
+    return
+  }
 
   const existingMessages = await messages.getMessages(message.channelId)
   console.log('Existing messages: ' + existingMessages.length.toString())
