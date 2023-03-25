@@ -19,9 +19,6 @@ const MODERATION_VIOLATION = getEnv('MODERATION_VIOLATION')
 const SYSTEM_MESSAGE = getEnv('SYSTEM_MESSAGE')
 const BOT_NAME = getEnv('BOT_NAME')
 const BOT_IMAGE_URL = getEnv('BOT_IMAGE_URL')
-const ONLY_RESPOND_TO_MENTIONS = getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase() === 'true' ||
-  getEnv('ONLY_RESPOND_TO_MENTIONS') === ''
-
 const CHANNEL_IDS = getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
   ? []
   : getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
