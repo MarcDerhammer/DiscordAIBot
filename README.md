@@ -12,3 +12,5 @@ Note, for gpt-3.5-turbo the token limit is 4096, so the bot won't remember extre
 Your bot needs to have the "Message Content Intent" permission enabled
 
 In your server, it needs to be given "bot", "Read Messages/View Channels", and "Send Messages" permissions
+
+Or just use the [Docker](https://hub.docker.com/repository/docker/mobatome/discordai/general)
