@@ -22,13 +22,13 @@ jobs:
 
       - name: Update package version
         run: |
-          npm install
+          yarn
           npm version --no-git-tag-version ${{ inputs.version }}
 
       - name: Commit the changes
         id: make-commit
         run: |
-          git add *
+          git add package.json
           git commit --message "Prepare release ${{ inputs.version }}"
 
       - name: Prune development dependencies
