@@ -41,28 +41,27 @@ jobs:
           tags: mobatome/discordai:${{ inputs.version }}
 
       - name: Create release branch
-        uses: peter-evans/create-pull-request@v3
+        run: |
+          RELEASE_NAME=${{ inputs.version }}
+          git checkout develop
+          git checkout -b release/$RELEASE_NAME
+      
+      - name: Push release branch
+        uses: ad-m/github-push-action@v0.6.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'Create release branch'
-          branch: main
-          title: 'Create release branch'
-          body: 'Automatically created by GitHub Actions.'
-          base: 'main'
-          head: 'release/${{ inputs.version }}'
-          draft: false
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: release/${{ inputs.version }}
 
-      - name: Create pull request
-        uses: peter-evans/create-pull-request@v3
+      - name: Create PR to master
+        uses: thomaseizinger/create-pull-request@master
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'Merge release branch into main'
-          branch: main
-          title: 'Merge release branch into main'
-          body: 'Automatically created by GitHub Actions.'
-          base: 'main'
-          head: 'release/${{ inputs.version }}'
-          draft: false
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          head: release/${{ inputs.version }}
+          base: main
+          title: Merge release/${{ inputs.version }} into main
+          body: |
+            This PR was created automatically by the GitHub Action, **Release**. 
+            Merging this should create a new tagged release on Main
           
       - name: Cleanup
         run: |
