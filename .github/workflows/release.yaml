@@ -25,6 +25,12 @@ jobs:
           npm install
           npm version --no-git-tag-version ${{ inputs.version }}
 
+      - name: Commit the changes
+        id: make-commit
+        run: |
+          git add *
+          git commit --message "Prepare release ${{ inputs.version }}"
+
       - name: Prune development dependencies
         run: npm prune --production
 
