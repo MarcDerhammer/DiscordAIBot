@@ -19,6 +19,9 @@ const MODERATION_VIOLATION = getEnv('MODERATION_VIOLATION')
 const SYSTEM_MESSAGE = getEnv('SYSTEM_MESSAGE')
 const BOT_NAME = getEnv('BOT_NAME')
 const BOT_IMAGE_URL = getEnv('BOT_IMAGE_URL')
+const CHANNEL_IDS = getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
+  ? []
+  : getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
 
 const MAX_TOKENS_IN_MESSAGES = LANGUAGE_MODEL === 'gpt-3.5-turbo' ? 4096 : 2048
 
@@ -61,11 +64,21 @@ const countTokens = async (channelId: string): Promise<number> => {
 
 client.on(Events.MessageCreate, async (message) => {
   if (client.user?.id == null || message.channelId == null) {
+    console.log('Client user or channel id is null, ignoring message')
+    return
+  }
+
+  if (
+    CHANNEL_IDS.length > 0 &&
+    !CHANNEL_IDS.includes(message.channelId.toString())
+  ) {
+    console.log('Channel not in list, ignoring')
     return
   }
 
   // ignore our own messages
   if (message.author.id === client.user.id) {
+    console.log('Ignoring our own message')
     return
   }
 
@@ -95,7 +108,7 @@ client.on(Events.MessageCreate, async (message) => {
   const existingMessages = await messages.getMessages(message.channelId)
   console.log('Existing messages: ' + existingMessages.length.toString())
 
-  if (!message.mentions.has(client.user)) {
+  if (!message.mentions.has(client.user) && ONLY_RESPOND_TO_MENTIONS) {
     console.log('Message does not mention bot, ignoring')
     return
   }
