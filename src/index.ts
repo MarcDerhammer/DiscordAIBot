@@ -26,6 +26,9 @@ const CHANNEL_IDS = getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
 const MAX_TOKENS_IN_MESSAGES = LANGUAGE_MODEL === 'gpt-3.5-turbo' ? 4096 : 2048
 const ONLY_RESPOND_TO_MENTIONS = getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase() === 'true' ||
   getEnv('ONLY_RESPOND_TO_MENTIONS') === ''
+const IGNORE_BOTS = getEnv('IGNORE_BOTS').toLowerCase() === 'true'
+const IGNORE_EVERYONE = getEnv('IGNORE_EVERYONE').toLowerCase() === 'true'
+const DISCLAIMER = getEnv('DISCLAIMER')
 
 const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
@@ -102,12 +105,14 @@ client.on(Events.MessageCreate, async (message) => {
   })
 
   // also ignore @everyone or role mentions
-  if (message.mentions.everyone || message.mentions.roles.size > 0) {
+  if ((message.mentions.everyone || message.mentions.roles.size > 0) && IGNORE_EVERYONE) {
+    console.log('Ignoring @everyone or role mention')
     return
   }
 
   // also ignore all bots.. we don't want to get into a loop
-  if (message.author.bot) {
+  if (message.author.bot && IGNORE_BOTS) {
+    console.log('Ignoring bot message')
     return
   }
 
@@ -119,7 +124,11 @@ client.on(Events.MessageCreate, async (message) => {
     return
   }
 
-  // if we were mentioned, reply with the completion
+  // if there were mentions that don't include us, ignore
+  if (message.mentions.users.size > 0 && !message.mentions.has(client.user)) {
+    console.log('Message mentions other users, ignoring')
+    return
+  }
 
   // set typing
   await message.channel.sendTyping()
@@ -174,10 +183,20 @@ client.on(Events.MessageCreate, async (message) => {
       ).toString()} tokens`
     )
 
-    const response = await openAiHelper.createChatCompletion(
+    let response = await openAiHelper.createChatCompletion(
       currentMessages ?? [],
       message.author.id
     )
+
+    // let's ensure our own response doesn't violate any moderation
+    // rules
+    if (await openAiHelper.areMessagesInappropriate([response])) {
+      console.log('Response flagged: ' + response)
+      await messages.clearMessages(message.channelId)
+      clearInterval(typingInterval)
+      await message.reply(MODERATION_VIOLATION)
+      return
+    }
 
     await messages.addMessage(message.channelId, {
       role: ChatCompletionRequestMessageRoleEnum.Assistant,
@@ -185,13 +204,27 @@ client.on(Events.MessageCreate, async (message) => {
       name: removeNonAlphanumeric(client.user.username)
     })
 
+    // if this is the first assistant message, send the disclaimer first
+    if (currentMessages.filter(
+      x => x.role === ChatCompletionRequestMessageRoleEnum.Assistant).length === 0 &&
+    DISCLAIMER.length > 0) {
+      response = DISCLAIMER + '\n\n' + response
+    }
+
     console.log('Response: ' + response)
     // if the message is too long, split it up into max of 2000
     // characters per message
     // split up the messsage into each 2000 character chunks
     const chunks = response.match(/[\s\S]{1,2000}/g)
     for (const chunk of chunks ?? []) {
-      await message.reply(chunk)
+      // if it was a mention, reply to the message
+      if (message.mentions.has(client.user)) {
+        await message.reply(chunk)
+      } else {
+        // otherwise, send message to channel
+        // (should only happen if ONLY_RESPOND_TO_MENTIONS = FALSE)
+        await message.channel.send(chunk)
+      }
     }
   } catch (e) {
     console.log(e)

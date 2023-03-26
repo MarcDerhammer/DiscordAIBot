@@ -33,9 +33,9 @@ jobs:
         uses: thomaseizinger/create-pull-request@1.0.0
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          head: main
+          head: ${{ github.event.pull_request.head.ref }}
           base: develop
           title: Merge release ${{ env.RELEASE_VERSION }} into develop branch
           body: |
             This PR merges the release branch for ${{ env.RELEASE_VERSION }} back into develop.
-            This happens to ensure that the updates that happend on the release branch, i.e. CHANGELOG and manifest updates are also present on the dev branch.
+            This happens to ensure that the updates that happened on the release branch, i.e. CHANGELOG and manifest updates are also present on the dev branch.
