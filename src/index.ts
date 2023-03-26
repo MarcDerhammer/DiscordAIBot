@@ -64,6 +64,10 @@ const countTokens = async (channelId: string): Promise<number> => {
   return encode(JSON.stringify(await messages.getMessages(channelId))).length
 }
 
+const removeNonAlphanumeric = (input: string): string => {
+  return input.replace(/[^a-zA-Z0-9]/g, '').trim()
+}
+
 client.on(Events.MessageCreate, async (message) => {
   if (client.user?.id == null || message.channelId == null) {
     console.log('Client user or channel id is null, ignoring message')
@@ -94,7 +98,7 @@ client.on(Events.MessageCreate, async (message) => {
   await messages.addMessage(message.channelId, {
     role: ChatCompletionRequestMessageRoleEnum.User,
     content: message.content,
-    name: message.author.username.replace(/\s/g, '').trim() // need to remove whitespace.. it breaks
+    name: removeNonAlphanumeric(message.author.username)
   })
 
   // also ignore @everyone or role mentions
@@ -178,8 +182,7 @@ client.on(Events.MessageCreate, async (message) => {
     await messages.addMessage(message.channelId, {
       role: ChatCompletionRequestMessageRoleEnum.Assistant,
       content: response,
-      // remove whitespace from username
-      name: client.user.username.replace(/\s/g, '').trim()
+      name: removeNonAlphanumeric(client.user.username)
     })
 
     console.log('Response: ' + response)
