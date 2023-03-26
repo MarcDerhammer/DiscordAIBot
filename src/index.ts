@@ -187,6 +187,17 @@ client.on(Events.MessageCreate, async (message) => {
       currentMessages ?? [],
       message.author.id
     )
+
+    // let's ensure our own response doesn't violate any moderation
+    // rules
+    if (await openAiHelper.areMessagesInappropriate([response])) {
+      console.log('Response flagged: ' + response)
+      await messages.clearMessages(message.channelId)
+      clearInterval(typingInterval)
+      await message.reply(MODERATION_VIOLATION)
+      return
+    }
+
     await messages.addMessage(message.channelId, {
       role: ChatCompletionRequestMessageRoleEnum.Assistant,
       content: response,
