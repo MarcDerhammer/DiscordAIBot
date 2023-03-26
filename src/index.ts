@@ -28,6 +28,7 @@ const ONLY_RESPOND_TO_MENTIONS = getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase(
   getEnv('ONLY_RESPOND_TO_MENTIONS') === ''
 const IGNORE_BOTS = getEnv('IGNORE_BOTS').toLowerCase() === 'true'
 const IGNORE_EVERYONE = getEnv('IGNORE_EVERYONE').toLowerCase() === 'true'
+const DISCLAIMER = getEnv('DISCLAIMER')
 
 const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
@@ -182,16 +183,22 @@ client.on(Events.MessageCreate, async (message) => {
       ).toString()} tokens`
     )
 
-    const response = await openAiHelper.createChatCompletion(
+    let response = await openAiHelper.createChatCompletion(
       currentMessages ?? [],
       message.author.id
     )
-
     await messages.addMessage(message.channelId, {
       role: ChatCompletionRequestMessageRoleEnum.Assistant,
       content: response,
       name: removeNonAlphanumeric(client.user.username)
     })
+
+    // if this is the first assistant message, send the disclaimer first
+    if (currentMessages.filter(
+      x => x.role === ChatCompletionRequestMessageRoleEnum.Assistant).length === 0 &&
+    DISCLAIMER.length > 0) {
+      response = DISCLAIMER + '\n\n' + response
+    }
 
     console.log('Response: ' + response)
     // if the message is too long, split it up into max of 2000

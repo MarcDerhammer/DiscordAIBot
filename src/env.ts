@@ -25,6 +25,7 @@ interface OptionalEnv {
   ONLY_RESPOND_IN_CHANNEL?: string
   IGNORE_BOTS?: 'true' | 'false'
   IGNORE_EVERYONE?: 'true' | 'false'
+  DISCLAIMER?: string
 }
 
 type Env = RequiredEnv & OptionalEnv
@@ -43,7 +44,8 @@ const env: EnvConfig = {
   ONLY_RESPOND_TO_MENTIONS: process.env.ONLY_RESPOND_TO_MENTIONS ?? 'true',
   ONLY_RESPOND_IN_CHANNEL: process.env.ONLY_RESPOND_IN_CHANNEL,
   IGNORE_BOTS: process.env.IGNORE_BOTS ?? 'true',
-  IGNORE_EVERYONE: process.env.IGNORE_EVERYONE ?? 'true'
+  IGNORE_EVERYONE: process.env.IGNORE_EVERYONE ?? 'true',
+  DISCLAIMER: process.env.DISCLAIMER
 }
 
 function isRequiredEnv (key: keyof Env): key is keyof RequiredEnv {

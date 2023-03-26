@@ -128,6 +128,7 @@ DISCORD_TOKEN=your_discord_token
 # ONLY_RESPOND_IN_CHANNEL=
 # IGNORE_BOTS=
 # IGNORE_EVERYONE=
+# DISCLAIMER=
 ```
 4. Run the Docker container with your `.env` file:
 ```shell
@@ -158,6 +159,7 @@ DISCORD_TOKEN=your_discord_token
 # ONLY_RESPOND_IN_CHANNEL=
 # IGNORE_BOTS=
 # IGNORE_EVERYONE=
+# DISCLAIMER=
 ```
 4. Run the bot with `yarn start` or `npm start`
 
@@ -182,6 +184,7 @@ These are the list of environment variables you can set to configure the bot.
 - `ONLY_RESPOND_IN_CHANNEL`: A comma-separated list of channel IDs if you want the bot to work only in specific channels. By default, it will operate in all channels it has access to.  To find a channel ID, enable "developer mode" in Discord and right click a text channel.
 - `IGNORE_BOTS`: Set this to `false` if you want the bot to respond to other bots (default: `true`) (This can become expensive/chaotic so be careful)
 - `IGNORE_EVERYONE`: Set this to `false` if you want the bot to respond to messages that mention `@everyone` or `@here` (default: `true`)
+- `DISCLAIMER`: This message will be sent immediatly before the first chat response is sent. [OpenAI Policy](https://openai.com/policies/usage-policies) requires chatbots to disclose that users are interacting with an AI system.  Read the [OpenAI Policy](https://openai.com/policies/usage-policies) for more information on how to comply with their policies.
 
 ## Memory and Token Limit
 
