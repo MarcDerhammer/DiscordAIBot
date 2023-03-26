@@ -79,7 +79,3 @@ jobs:
           body: |
             This PR was created automatically by the GitHub Action, **Release**. 
             Merging this should create a new tagged release on Main
-          
-      - name: Cleanup
-        run: |
-          npm prune --production
