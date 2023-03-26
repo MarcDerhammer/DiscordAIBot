@@ -1,6 +1,12 @@
 import dotenv from 'dotenv'
 dotenv.config()
 
+const DEFAULT_ERROR_RESPONSE =
+  'Sorry, there was an error. Please try again later.'
+const DEFUALT_MODERATION_VIOLATION_RESPONSE =
+  'Some content was detected violating Open AI\'s usage policies. ' +
+  'Chat history has been cleared from future responses.'
+
 type EnvConfig = Record<string, string | undefined>
 
 interface RequiredEnv {
@@ -24,25 +30,20 @@ type Env = RequiredEnv & OptionalEnv
 const env: EnvConfig = {
   API_KEY: process.env.OPENAI_API_KEY,
   DISCORD_TOKEN: process.env.DISCORD_TOKEN,
-  LANGUAGE_MODEL: process.env.LANGUAGE_MODEL,
-  ERROR_RESPONSE: process.env.ERROR_RESPONSE,
-  MODERATION_VIOLATION: process.env.MODERATION_VIOLATION_RESPONSE,
+  LANGUAGE_MODEL: process.env.LANGUAGE_MODEL ?? 'gpt-3.5-turbo',
+  ERROR_RESPONSE: process.env.ERROR_RESPONSE ?? DEFAULT_ERROR_RESPONSE,
+  MODERATION_VIOLATION:
+    process.env.MODERATION_VIOLATION_RESPONSE ??
+    DEFUALT_MODERATION_VIOLATION_RESPONSE,
   SYSTEM_MESSAGE: process.env.SYSTEM_MESSAGE,
   BOT_NAME: process.env.BOT_NAME,
   BOT_IMAGE_URL: process.env.BOT_IMAGE_URL,
-  ONLY_RESPOND_TO_MENTIONS: process.env.ONLY_RESPOND_TO_MENTIONS,
+  ONLY_RESPOND_TO_MENTIONS: process.env.ONLY_RESPOND_TO_MENTIONS ?? 'true',
   ONLY_RESPOND_IN_CHANNEL: process.env.ONLY_RESPOND_IN_CHANNEL
 }
 
 function isRequiredEnv (key: keyof Env): key is keyof RequiredEnv {
-  return [
-    'API_KEY',
-    'DISCORD_TOKEN',
-    'LANGUAGE_MODEL',
-    'ERROR_RESPONSE',
-    'MODERATION_VIOLATION',
-    'SYSTEM_MESSAGE'
-  ].includes(key)
+  return ['API_KEY', 'DISCORD_TOKEN'].includes(key)
 }
 
 export function getEnv (key: keyof Env): string {
