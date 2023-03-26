@@ -12,17 +12,19 @@ type EnvConfig = Record<string, string | undefined>
 interface RequiredEnv {
   API_KEY: string
   DISCORD_TOKEN: string
-  LANGUAGE_MODEL: string
-  ERROR_RESPONSE: string
-  MODERATION_VIOLATION: string
-  SYSTEM_MESSAGE: string
 }
 
 interface OptionalEnv {
+  LANGUAGE_MODEL?: string
+  ERROR_RESPONSE?: string
+  MODERATION_VIOLATION?: string
+  SYSTEM_MESSAGE?: string
   BOT_NAME?: string
   BOT_IMAGE_URL?: string
-  ONLY_RESPOND_TO_MENTIONS?: string
+  ONLY_RESPOND_TO_MENTIONS?: 'true' | 'false'
   ONLY_RESPOND_IN_CHANNEL?: string
+  IGNORE_BOTS?: 'true' | 'false'
+  IGNORE_EVERYONE?: 'true' | 'false'
 }
 
 type Env = RequiredEnv & OptionalEnv
@@ -39,7 +41,9 @@ const env: EnvConfig = {
   BOT_NAME: process.env.BOT_NAME,
   BOT_IMAGE_URL: process.env.BOT_IMAGE_URL,
   ONLY_RESPOND_TO_MENTIONS: process.env.ONLY_RESPOND_TO_MENTIONS ?? 'true',
-  ONLY_RESPOND_IN_CHANNEL: process.env.ONLY_RESPOND_IN_CHANNEL
+  ONLY_RESPOND_IN_CHANNEL: process.env.ONLY_RESPOND_IN_CHANNEL,
+  IGNORE_BOTS: process.env.IGNORE_BOTS ?? 'true',
+  IGNORE_EVERYONE: process.env.IGNORE_EVERYONE ?? 'true'
 }
 
 function isRequiredEnv (key: keyof Env): key is keyof RequiredEnv {
