@@ -5,11 +5,27 @@ import {
   OpenAIApi
 } from 'openai'
 
-import { Client, Events, GatewayIntentBits } from 'discord.js'
-import { encode } from 'gpt-3-encoder'
+import {
+  Client,
+  type CommandInteraction,
+  Events,
+  GatewayIntentBits,
+  PermissionFlagsBits,
+  TextInputBuilder,
+  ActionRowBuilder,
+  ModalBuilder,
+  TextInputStyle,
+  ButtonBuilder,
+  ButtonStyle
+} from 'discord.js'
 import { getEnv } from './env'
 import { Messages } from './Messages'
-import { OpenAiHelper } from './OpenAiHelper'
+import {
+  countTokens,
+  getMaxTokens,
+  type Model,
+  OpenAiHelper
+} from './OpenAiHelper'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
@@ -19,16 +35,22 @@ const MODERATION_VIOLATION = getEnv('MODERATION_VIOLATION')
 const SYSTEM_MESSAGE = getEnv('SYSTEM_MESSAGE')
 const BOT_NAME = getEnv('BOT_NAME')
 const BOT_IMAGE_URL = getEnv('BOT_IMAGE_URL')
-const CHANNEL_IDS = getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
-  ? []
-  : getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
+const CHANNEL_IDS =
+  getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
+    ? []
+    : getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
 
-const MAX_TOKENS_IN_MESSAGES = LANGUAGE_MODEL === 'gpt-3.5-turbo' ? 4096 : 2048
-const ONLY_RESPOND_TO_MENTIONS = getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase() === 'true' ||
+const ONLY_RESPOND_TO_MENTIONS =
+  getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase() === 'true' ||
   getEnv('ONLY_RESPOND_TO_MENTIONS') === ''
 const IGNORE_BOTS = getEnv('IGNORE_BOTS').toLowerCase() === 'true'
 const IGNORE_EVERYONE = getEnv('IGNORE_EVERYONE').toLowerCase() === 'true'
 const DISCLAIMER = getEnv('DISCLAIMER')
+
+const TOTAL_MAX_TOKENS =
+  getEnv('MAX_TOKENS_PER_MESSAGE') !== ''
+    ? parseInt(getEnv('MAX_TOKENS_PER_MESSAGE'), 10)
+    : undefined
 
 const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
@@ -38,14 +60,6 @@ const openAiHelper = new OpenAiHelper(
   ),
   LANGUAGE_MODEL
 )
-
-const systemMessages: ChatCompletionRequestMessage[] = [
-  {
-    role: ChatCompletionRequestMessageRoleEnum.System,
-    content: SYSTEM_MESSAGE
-  }
-]
-
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -54,18 +68,185 @@ const client = new Client({
   ]
 })
 
-client.once(Events.ClientReady, () => {
+const COMMAND_PERMISSIONS = [
+  PermissionFlagsBits.Administrator,
+  PermissionFlagsBits.ManageMessages,
+  PermissionFlagsBits.ManageChannels,
+  PermissionFlagsBits.ManageGuild,
+  PermissionFlagsBits.ModerateMembers
+]
+
+client.once(Events.ClientReady, async () => {
   console.log(
     `Ready!  Using model: ${LANGUAGE_MODEL} and system message ` +
-      `${systemMessages.map((message) => message.content).join(', ')}`
+      `${SYSTEM_MESSAGE}`
   )
+  await client.application?.commands.create({
+    name: 'reset',
+    description: 'Reset the current conversation',
+    defaultMemberPermissions: COMMAND_PERMISSIONS
+  })
+  await client.application?.commands.create({
+    name: 'system',
+    description: 'Add a system message',
+    defaultMemberPermissions: COMMAND_PERMISSIONS
+  })
 })
 
-const messages = new Messages(systemMessages)
+// register commands to the their handlers
+const commands = new Map<
+string,
+(interaction: CommandInteraction) => Promise<void>
+>()
+commands.set('reset', async (interaction) => {
+  const row = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('reset_all')
+        .setLabel('Clear All')
+        .setStyle(ButtonStyle.Danger)
+    )
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('reset_user')
+        .setLabel('Clear User Messages')
+        .setStyle(ButtonStyle.Danger)
+    )
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('reset_system')
+        .setLabel('Clear System Messages')
+        .setStyle(ButtonStyle.Danger)
+    )
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('reset_bot_messages')
+        .setLabel('Clear Bot Messages')
+        .setStyle(ButtonStyle.Danger)
+    )
 
-const countTokens = async (channelId: string): Promise<number> => {
-  return encode(JSON.stringify(await messages.getMessages(channelId))).length
-}
+  await interaction.reply({
+    content: 'Reset this conversation? This will remove the messages from my memory.',
+    // @ts-expect-error this is fine
+    components: [row]
+  })
+})
+
+commands.set('system', async (interaction) => {
+  const modal = new ModalBuilder()
+    .setTitle('Add a system message')
+    .setCustomId('add_system_message')
+
+  const systemMessageInput = new TextInputBuilder()
+    .setCustomId('system_message')
+    .setPlaceholder(
+      'Enter a system message. This will be sent as a "system" message to the bot.'
+    )
+    .setLabel('System message')
+    .setStyle(TextInputStyle.Paragraph)
+
+  const firstActionRow = new ActionRowBuilder().addComponents(
+    systemMessageInput
+  )
+
+  // @ts-expect-error this is fine
+  modal.addComponents(firstActionRow)
+
+  // prompt user for the system message
+  // add another command prompt for the system message
+  await interaction.showModal(modal)
+})
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isButton()) {
+    return
+  }
+
+  if (interaction.customId === 'reset_all') {
+    const groupId = interaction.channelId.toString()
+    messages.clearMessages(groupId)
+    await interaction.reply({
+      content: `The conversation was reset by <@${interaction.user.id}>`
+    })
+  }
+  if (interaction.customId === 'reset_user') {
+    const groupId = interaction.channelId.toString()
+    messages.removeAllUserMessages(groupId)
+    await interaction.reply({
+      content: `The user messages were reset by <@${interaction.user.id}>`
+    })
+  }
+  if (interaction.customId === 'reset_system') {
+    const groupId = interaction.channelId.toString()
+    messages.removeAllSystemMessages(groupId)
+    await interaction.reply({
+      content: `The system messages were reset by <@${interaction.user.id}>`
+    })
+  }
+  if (interaction.customId === 'reset_bot_messages') {
+    const groupId = interaction.channelId.toString()
+    messages.removeAllBotMessages(groupId)
+    await interaction.reply({
+      content: `The bot messages were reset by <@${interaction.user.id}>`
+    })
+  }
+})
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (
+    !interaction.isModalSubmit() ||
+    interaction.customId.length === 0 ||
+    interaction.channelId == null
+  ) {
+    return
+  }
+
+  if (interaction.customId === 'add_system_message') {
+    const groupId = interaction.channelId.toString()
+    const systemMessage = interaction.fields.getTextInputValue('system_message')
+    if (systemMessage == null) {
+      await interaction.reply({
+        content: 'System message is null, ignoring',
+        ephemeral: true
+      })
+      return
+    }
+    messages.addMessage(groupId, {
+      role: ChatCompletionRequestMessageRoleEnum.System,
+      content: systemMessage
+    })
+    await interaction.reply({
+      content: `<@${interaction.user.id}> added a system message: ${systemMessage}`
+    })
+  }
+})
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (interaction.isCommand()) {
+    // register handlers in the commands
+    const command = commands.get(interaction.commandName)
+    if (command == null) {
+      console.log('Command not found: ' + interaction.commandName)
+      return
+    }
+    try {
+      await command(interaction)
+    } catch (error) {
+      console.error(error)
+      await interaction.reply({
+        content: ERROR_RESPONSE,
+        ephemeral: true
+      })
+    }
+  }
+})
+
+const messages = new Messages(SYSTEM_MESSAGE.length > 0
+  ? [{
+      role: ChatCompletionRequestMessageRoleEnum.System,
+      content: SYSTEM_MESSAGE
+    }]
+  : [])
 
 const removeNonAlphanumeric = (input: string): string => {
   return input.replace(/[^a-zA-Z0-9]/g, '').trim()
@@ -91,21 +272,24 @@ client.on(Events.MessageCreate, async (message) => {
     return
   }
 
-  if ((await messages.getMessages(message.channelId)) == null) {
+  if (messages.getMessages(message.channelId) == null) {
     console.log(
       'Channel messages is null, ignoring message: ' + message.content
     )
     return
   }
 
-  await messages.addMessage(message.channelId, {
+  messages.addMessage(message.channelId, {
     role: ChatCompletionRequestMessageRoleEnum.User,
     content: message.content,
     name: removeNonAlphanumeric(message.author.username)
   })
 
   // also ignore @everyone or role mentions
-  if ((message.mentions.everyone || message.mentions.roles.size > 0) && IGNORE_EVERYONE) {
+  if (
+    (message.mentions.everyone || message.mentions.roles.size > 0) &&
+    IGNORE_EVERYONE
+  ) {
     console.log('Ignoring @everyone or role mention')
     return
   }
@@ -116,7 +300,7 @@ client.on(Events.MessageCreate, async (message) => {
     return
   }
 
-  const existingMessages = await messages.getMessages(message.channelId)
+  const existingMessages = messages.getMessages(message.channelId)
   console.log('Existing messages: ' + existingMessages.length.toString())
 
   if (!message.mentions.has(client.user) && ONLY_RESPOND_TO_MENTIONS) {
@@ -147,7 +331,7 @@ client.on(Events.MessageCreate, async (message) => {
   try {
     console.log('Checking moderation...')
 
-    const currentMessages = await messages.getMessages(message.channelId)
+    const currentMessages = messages.getMessages(message.channelId)
 
     console.log(currentMessages?.map((message) => message.content) ?? [])
 
@@ -158,7 +342,7 @@ client.on(Events.MessageCreate, async (message) => {
 
     if (inappropriate) {
       console.log('Message flagged: ' + message.content)
-      await messages.clearMessages(message.channelId)
+      messages.clearMessages(message.channelId)
       clearInterval(typingInterval)
       await message.reply(MODERATION_VIOLATION)
       return
@@ -169,45 +353,49 @@ client.on(Events.MessageCreate, async (message) => {
     // if our messages are too long, remove oldest ones until we're
     // under the MAX_TOKENS_IN_MESSAGES
     // ignore System messages in this calculation
-    let totalTokens = await countTokens(message.channelId)
-    while (totalTokens > MAX_TOKENS_IN_MESSAGES) {
+    let totalTokens = countTokens(messages.getMessages(message.channelId))
+    while (
+      totalTokens > getMaxTokens(LANGUAGE_MODEL as Model, TOTAL_MAX_TOKENS)
+    ) {
       console.log('Removing oldest message to make room for new message: ')
-      await messages.removeOldestNonSystemMessage(message.channelId)
-      totalTokens = await countTokens(message.channelId)
+      messages.removeOldestNonSystemMessage(message.channelId)
+      totalTokens = countTokens(messages.getMessages(message.channelId))
       console.log(`Total tokens: ${totalTokens}`)
     }
 
     console.log(
-      `Generating completion using ${(
-        await countTokens(message.channelId)
-      ).toString()} tokens`
+      `Generating completion using ${totalTokens} tokens from history`
     )
 
     let response = await openAiHelper.createChatCompletion(
-      currentMessages ?? [],
-      message.author.id
+      messages.getMessages(message.channelId) ?? [],
+      message.author.id,
+      TOTAL_MAX_TOKENS
     )
 
     // let's ensure our own response doesn't violate any moderation
     // rules
     if (await openAiHelper.areMessagesInappropriate([response])) {
       console.log('Response flagged: ' + response)
-      await messages.clearMessages(message.channelId)
+      messages.clearMessages(message.channelId)
       clearInterval(typingInterval)
       await message.reply(MODERATION_VIOLATION)
       return
     }
 
-    await messages.addMessage(message.channelId, {
+    messages.addMessage(message.channelId, {
       role: ChatCompletionRequestMessageRoleEnum.Assistant,
       content: response,
       name: removeNonAlphanumeric(client.user.username)
     })
 
     // if this is the first assistant message, send the disclaimer first
-    if (currentMessages.filter(
-      x => x.role === ChatCompletionRequestMessageRoleEnum.Assistant).length === 0 &&
-    DISCLAIMER.length > 0) {
+    if (
+      currentMessages.filter(
+        (x) => x.role === ChatCompletionRequestMessageRoleEnum.Assistant
+      ).length === 0 &&
+      DISCLAIMER.length > 0
+    ) {
       response = DISCLAIMER + '\n\n' + response
     }
 
