@@ -11,6 +11,7 @@ This repository contains a Discord bot that leverages OpenAI's powerful language
 - Option to reply to all messages or just mentions
 - Option to limit bot to specific channels
 - Error handling and moderation violation responses
+- Commands to set and re-set system messages on the fly
 
 # Instructions
 
@@ -167,6 +168,27 @@ DISCORD_TOKEN=your_discord_token
 4. Run the bot with `yarn start` or `npm start`
 
 --- 
+# Discord Bot Commands
+
+This Discord bot has two primary commands. These commands are `/reset` and `/system`.
+
+By default, the following roles will have permission to use these commands: `Administrator`, `ManageMessages`, `ManageChannels`, `ManagerGuild`, `ModerateMembers` but of course you can override these permissions in your server settings.
+
+## /reset
+
+The `/reset` command allows users to clear messages from the bot's memory based on the message type. Users can choose to reset ALL, user, system, or "bot" messages. A button will appear in the chat window that allows users to reset the messages. Use this if things are getting too wacky or you want to start over.  Note, if you set any `SYSTEM_MESSAGE` environment variables, it will be retained.  The command will only reset any messages that were set by the `/system` command.
+
+## /system
+
+The `/system` command will allow you to set the `system` message for the bot.  This can guide the bot to act a certain way.  For example:
+- You only speak spanish
+- You are a pirate
+- You are a time traveller from the year 2552
+- You are some character from a popular show or movie
+- You only speak in pig latin
+- You overuse emojis 😀
+--- 
+
 ## Configuration
 
 These are the list of environment variables you can set to configure the bot.
@@ -177,7 +199,7 @@ These are the list of environment variables you can set to configure the bot.
 - `DISCORD_TOKEN`: Your Discord Bot token, required for the bot to work with Discord
 
 ### Optional
-- `SYSTEM_MESSAGE`: The initial prompt to use with the bot, sent as a "system" message. Example: `You are the Master Chief from Halo. Stay in character as much as possible`
+- `SYSTEM_MESSAGE`: The initial prompt to use with the bot, sent as a "system" message. Example: `You are the Master Chief from Halo. Stay in character as much as possible` You can also set or clear system messages with the `/system` and `/reset` command (see above)
 - `ERROR_RESPONSE`: The message the bot will send when there's an error in processing the user's input. These appear when there's some sort of error. See the logs for information. Default: `Sorry, there was an error. Please try again later.`
 - `MODERATION_VIOLATION_RESPONSE`: The message the bot will send when a user's input violates OpenAI's moderation policy. It should probably also mention that the chat history will stop being processed before this point.  Default: `Some content was detected violating Open AI's usage policies. Chat history has been cleared from future responses.`
 - `LANGUAGE_MODEL`: The OpenAI language model you wish to use.  Defaults to `gpt-3.5-turbo`.

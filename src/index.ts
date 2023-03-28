@@ -10,7 +10,13 @@ import {
   type CommandInteraction,
   Events,
   GatewayIntentBits,
-  PermissionFlagsBits
+  PermissionFlagsBits,
+  TextInputBuilder,
+  ActionRowBuilder,
+  ModalBuilder,
+  TextInputStyle,
+  ButtonBuilder,
+  ButtonStyle
 } from 'discord.js'
 import { getEnv } from './env'
 import { Messages } from './Messages'
@@ -54,13 +60,6 @@ const openAiHelper = new OpenAiHelper(
   ),
   LANGUAGE_MODEL
 )
-const systemMessages: ChatCompletionRequestMessage[] = [
-  {
-    role: ChatCompletionRequestMessageRoleEnum.System,
-    content: SYSTEM_MESSAGE
-  }
-]
-
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -69,21 +68,28 @@ const client = new Client({
   ]
 })
 
+const COMMAND_PERMISSIONS = [
+  PermissionFlagsBits.Administrator,
+  PermissionFlagsBits.ManageMessages,
+  PermissionFlagsBits.ManageChannels,
+  PermissionFlagsBits.ManageGuild,
+  PermissionFlagsBits.ModerateMembers
+]
+
 client.once(Events.ClientReady, async () => {
   console.log(
     `Ready!  Using model: ${LANGUAGE_MODEL} and system message ` +
-      `${systemMessages.map((message) => message.content).join(', ')}`
+      `${SYSTEM_MESSAGE}`
   )
   await client.application?.commands.create({
     name: 'reset',
     description: 'Reset the current conversation',
-    defaultMemberPermissions: [
-      PermissionFlagsBits.Administrator,
-      PermissionFlagsBits.ManageMessages,
-      PermissionFlagsBits.ManageChannels,
-      PermissionFlagsBits.ManageGuild,
-      PermissionFlagsBits.ModerateMembers
-    ]
+    defaultMemberPermissions: COMMAND_PERMISSIONS
+  })
+  await client.application?.commands.create({
+    name: 'system',
+    description: 'Add a system message',
+    defaultMemberPermissions: COMMAND_PERMISSIONS
   })
 })
 
@@ -93,11 +99,126 @@ string,
 (interaction: CommandInteraction) => Promise<void>
 >()
 commands.set('reset', async (interaction) => {
-  const groupId = interaction.channelId.toString()
-  messages.clearMessages(groupId)
+  const row = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('reset_all')
+        .setLabel('Clear All')
+        .setStyle(ButtonStyle.Danger)
+    )
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('reset_user')
+        .setLabel('Clear User Messages')
+        .setStyle(ButtonStyle.Danger)
+    )
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('reset_system')
+        .setLabel('Clear System Messages')
+        .setStyle(ButtonStyle.Danger)
+    )
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('reset_bot_messages')
+        .setLabel('Clear Bot Messages')
+        .setStyle(ButtonStyle.Danger)
+    )
+
   await interaction.reply({
-    content: `The conversation was reset by <@${interaction.user.id}>`
+    content: 'Reset this conversation? This will remove the messages from my memory.',
+    // @ts-expect-error this is fine
+    components: [row]
   })
+})
+
+commands.set('system', async (interaction) => {
+  const modal = new ModalBuilder()
+    .setTitle('Add a system message')
+    .setCustomId('add_system_message')
+
+  const systemMessageInput = new TextInputBuilder()
+    .setCustomId('system_message')
+    .setPlaceholder(
+      'Enter a system message. This will be sent as a "system" message to the bot.'
+    )
+    .setLabel('System message')
+    .setStyle(TextInputStyle.Paragraph)
+
+  const firstActionRow = new ActionRowBuilder().addComponents(
+    systemMessageInput
+  )
+
+  // @ts-expect-error this is fine
+  modal.addComponents(firstActionRow)
+
+  // prompt user for the system message
+  // add another command prompt for the system message
+  await interaction.showModal(modal)
+})
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isButton()) {
+    return
+  }
+
+  if (interaction.customId === 'reset_all') {
+    const groupId = interaction.channelId.toString()
+    messages.clearMessages(groupId)
+    await interaction.reply({
+      content: `The conversation was reset by <@${interaction.user.id}>`
+    })
+  }
+  if (interaction.customId === 'reset_user') {
+    const groupId = interaction.channelId.toString()
+    messages.removeAllUserMessages(groupId)
+    await interaction.reply({
+      content: `The user messages were reset by <@${interaction.user.id}>`
+    })
+  }
+  if (interaction.customId === 'reset_system') {
+    const groupId = interaction.channelId.toString()
+    messages.removeAllSystemMessages(groupId)
+    await interaction.reply({
+      content: `The system messages were reset by <@${interaction.user.id}>`
+    })
+  }
+  if (interaction.customId === 'reset_bot_messages') {
+    const groupId = interaction.channelId.toString()
+    messages.removeAllBotMessages(groupId)
+    await interaction.reply({
+      content: `The bot messages were reset by <@${interaction.user.id}>`
+    })
+  }
+})
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (
+    !interaction.isModalSubmit() ||
+    interaction.customId.length === 0 ||
+    interaction.channelId == null
+  ) {
+    return
+  }
+
+  if (interaction.customId === 'add_system_message') {
+    const groupId = interaction.channelId.toString()
+    const systemMessage = interaction.fields.getTextInputValue('system_message')
+    if (systemMessage == null) {
+      await interaction.reply({
+        content: 'System message is null, ignoring',
+        ephemeral: true
+      })
+      return
+    }
+    messages.addMessage(groupId, {
+      role: ChatCompletionRequestMessageRoleEnum.System,
+      content: systemMessage
+    })
+    await interaction.reply({
+      content: `<@${interaction.user.id}> added a system message: ${systemMessage}`
+    })
+  }
 })
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -120,7 +241,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 })
 
-const messages = new Messages(systemMessages)
+const messages = new Messages(SYSTEM_MESSAGE.length > 0
+  ? [{
+      role: ChatCompletionRequestMessageRoleEnum.System,
+      content: SYSTEM_MESSAGE
+    }]
+  : [])
 
 const removeNonAlphanumeric = (input: string): string => {
   return input.replace(/[^a-zA-Z0-9]/g, '').trim()
