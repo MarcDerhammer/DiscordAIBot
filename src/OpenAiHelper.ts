@@ -20,19 +20,23 @@ export class OpenAiHelper {
 
   async createChatCompletion (
     messages: ChatCompletionRequestMessage[],
-    user?: string
+    user?: string,
+    totalMaxTokens?: number
   ): Promise<string> {
-    const tokenCount = countTokens(messages)
+    const MAX_TOKEN_COUNT = getMaxTokens(this.languageModel as Model, totalMaxTokens) -
+      countTokens(messages)
 
-    const maxTokens = getMaxTokens(this.languageModel as Model) - tokenCount
+    if (MAX_TOKEN_COUNT <= 0) {
+      throw new Error('Max tokens is less than or equal to 0')
+    }
 
-    console.log('Max tokens: ' + maxTokens.toString())
+    console.log('Max tokens: ' + MAX_TOKEN_COUNT.toString())
 
     const response = await this.openai.createChatCompletion({
       model: this.languageModel,
       messages,
       user,
-      max_tokens: maxTokens
+      max_tokens: MAX_TOKEN_COUNT
     })
 
     if (response.status !== 200) {

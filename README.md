@@ -129,6 +129,7 @@ DISCORD_TOKEN=your_discord_token
 # IGNORE_BOTS=
 # IGNORE_EVERYONE=
 # DISCLAIMER=
+# MAX_TOKENS_PER_MESSAGE=
 ```
 4. Run the Docker container with your `.env` file:
 ```shell
@@ -160,6 +161,8 @@ DISCORD_TOKEN=your_discord_token
 # IGNORE_BOTS=
 # IGNORE_EVERYONE=
 # DISCLAIMER=
+# MAX_TOKENS_PER_MESSAGE=
+
 ```
 4. Run the bot with `yarn start` or `npm start`
 
@@ -185,6 +188,7 @@ These are the list of environment variables you can set to configure the bot.
 - `IGNORE_BOTS`: Set this to `false` if you want the bot to respond to other bots (default: `true`) (This can become expensive/chaotic so be careful)
 - `IGNORE_EVERYONE`: Set this to `false` if you want the bot to respond to messages that mention `@everyone` or `@here` (default: `true`)
 - `DISCLAIMER`: This message will be sent immediatly before the first chat response is sent. [OpenAI Policy](https://openai.com/policies/usage-policies) requires chatbots to disclose that users are interacting with an AI system.  Read the [OpenAI Policy](https://openai.com/policies/usage-policies) for more information on how to comply with their policies.
+- `MAX_TOKENS_PER_MESSAGE`: Set a limit for the number of tokens used per chat completion. If you set this number too small the bot won't "remember" many past messages, but if you set it too high, your bill will be higher.  By default it's the max of the model. [See here for more info](https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them)
 
 ## Memory and Token Limit
 

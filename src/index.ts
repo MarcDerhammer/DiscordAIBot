@@ -28,6 +28,10 @@ const IGNORE_BOTS = getEnv('IGNORE_BOTS').toLowerCase() === 'true'
 const IGNORE_EVERYONE = getEnv('IGNORE_EVERYONE').toLowerCase() === 'true'
 const DISCLAIMER = getEnv('DISCLAIMER')
 
+const TOTAL_MAX_TOKENS = getEnv('MAX_TOKENS_PER_MESSAGE') !== ''
+  ? parseInt(getEnv('MAX_TOKENS_PER_MESSAGE'), 10)
+  : undefined
+
 const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
     new Configuration({
@@ -164,7 +168,7 @@ client.on(Events.MessageCreate, async (message) => {
     // under the MAX_TOKENS_IN_MESSAGES
     // ignore System messages in this calculation
     let totalTokens = countTokens(messages.getMessages(message.channelId))
-    while (totalTokens > getMaxTokens(LANGUAGE_MODEL as Model)) {
+    while (totalTokens > getMaxTokens(LANGUAGE_MODEL as Model, TOTAL_MAX_TOKENS)) {
       console.log('Removing oldest message to make room for new message: ')
       messages.removeOldestNonSystemMessage(message.channelId)
       totalTokens = countTokens(messages.getMessages(message.channelId))
@@ -176,8 +180,9 @@ client.on(Events.MessageCreate, async (message) => {
     )
 
     let response = await openAiHelper.createChatCompletion(
-      currentMessages ?? [],
-      message.author.id
+      messages.getMessages(message.channelId) ?? [],
+      message.author.id,
+      TOTAL_MAX_TOKENS
     )
 
     // let's ensure our own response doesn't violate any moderation
