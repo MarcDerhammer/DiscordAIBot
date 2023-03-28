@@ -5,10 +5,21 @@ import {
   OpenAIApi
 } from 'openai'
 
-import { Client, Events, GatewayIntentBits } from 'discord.js'
+import {
+  Client,
+  type CommandInteraction,
+  Events,
+  GatewayIntentBits,
+  PermissionFlagsBits
+} from 'discord.js'
 import { getEnv } from './env'
 import { Messages } from './Messages'
-import { countTokens, getMaxTokens, type Model, OpenAiHelper } from './OpenAiHelper'
+import {
+  countTokens,
+  getMaxTokens,
+  type Model,
+  OpenAiHelper
+} from './OpenAiHelper'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
@@ -18,19 +29,22 @@ const MODERATION_VIOLATION = getEnv('MODERATION_VIOLATION')
 const SYSTEM_MESSAGE = getEnv('SYSTEM_MESSAGE')
 const BOT_NAME = getEnv('BOT_NAME')
 const BOT_IMAGE_URL = getEnv('BOT_IMAGE_URL')
-const CHANNEL_IDS = getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
-  ? []
-  : getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
+const CHANNEL_IDS =
+  getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
+    ? []
+    : getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
 
-const ONLY_RESPOND_TO_MENTIONS = getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase() === 'true' ||
+const ONLY_RESPOND_TO_MENTIONS =
+  getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase() === 'true' ||
   getEnv('ONLY_RESPOND_TO_MENTIONS') === ''
 const IGNORE_BOTS = getEnv('IGNORE_BOTS').toLowerCase() === 'true'
 const IGNORE_EVERYONE = getEnv('IGNORE_EVERYONE').toLowerCase() === 'true'
 const DISCLAIMER = getEnv('DISCLAIMER')
 
-const TOTAL_MAX_TOKENS = getEnv('MAX_TOKENS_PER_MESSAGE') !== ''
-  ? parseInt(getEnv('MAX_TOKENS_PER_MESSAGE'), 10)
-  : undefined
+const TOTAL_MAX_TOKENS =
+  getEnv('MAX_TOKENS_PER_MESSAGE') !== ''
+    ? parseInt(getEnv('MAX_TOKENS_PER_MESSAGE'), 10)
+    : undefined
 
 const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
@@ -40,7 +54,6 @@ const openAiHelper = new OpenAiHelper(
   ),
   LANGUAGE_MODEL
 )
-
 const systemMessages: ChatCompletionRequestMessage[] = [
   {
     role: ChatCompletionRequestMessageRoleEnum.System,
@@ -56,11 +69,55 @@ const client = new Client({
   ]
 })
 
-client.once(Events.ClientReady, () => {
+client.once(Events.ClientReady, async () => {
   console.log(
     `Ready!  Using model: ${LANGUAGE_MODEL} and system message ` +
       `${systemMessages.map((message) => message.content).join(', ')}`
   )
+  await client.application?.commands.create({
+    name: 'reset',
+    description: 'Reset the current conversation',
+    defaultMemberPermissions: [
+      PermissionFlagsBits.Administrator,
+      PermissionFlagsBits.ManageMessages,
+      PermissionFlagsBits.ManageChannels,
+      PermissionFlagsBits.ManageGuild,
+      PermissionFlagsBits.ModerateMembers
+    ]
+  })
+})
+
+// register commands to the their handlers
+const commands = new Map<
+string,
+(interaction: CommandInteraction) => Promise<void>
+>()
+commands.set('reset', async (interaction) => {
+  const groupId = interaction.channelId.toString()
+  messages.clearMessages(groupId)
+  await interaction.reply({
+    content: `The conversation was reset by <@${interaction.user.id}>`
+  })
+})
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (interaction.isCommand()) {
+    // register handlers in the commands
+    const command = commands.get(interaction.commandName)
+    if (command == null) {
+      console.log('Command not found: ' + interaction.commandName)
+      return
+    }
+    try {
+      await command(interaction)
+    } catch (error) {
+      console.error(error)
+      await interaction.reply({
+        content: ERROR_RESPONSE,
+        ephemeral: true
+      })
+    }
+  }
 })
 
 const messages = new Messages(systemMessages)
@@ -89,7 +146,7 @@ client.on(Events.MessageCreate, async (message) => {
     return
   }
 
-  if ((messages.getMessages(message.channelId)) == null) {
+  if (messages.getMessages(message.channelId) == null) {
     console.log(
       'Channel messages is null, ignoring message: ' + message.content
     )
@@ -103,7 +160,10 @@ client.on(Events.MessageCreate, async (message) => {
   })
 
   // also ignore @everyone or role mentions
-  if ((message.mentions.everyone || message.mentions.roles.size > 0) && IGNORE_EVERYONE) {
+  if (
+    (message.mentions.everyone || message.mentions.roles.size > 0) &&
+    IGNORE_EVERYONE
+  ) {
     console.log('Ignoring @everyone or role mention')
     return
   }
@@ -168,7 +228,9 @@ client.on(Events.MessageCreate, async (message) => {
     // under the MAX_TOKENS_IN_MESSAGES
     // ignore System messages in this calculation
     let totalTokens = countTokens(messages.getMessages(message.channelId))
-    while (totalTokens > getMaxTokens(LANGUAGE_MODEL as Model, TOTAL_MAX_TOKENS)) {
+    while (
+      totalTokens > getMaxTokens(LANGUAGE_MODEL as Model, TOTAL_MAX_TOKENS)
+    ) {
       console.log('Removing oldest message to make room for new message: ')
       messages.removeOldestNonSystemMessage(message.channelId)
       totalTokens = countTokens(messages.getMessages(message.channelId))
@@ -202,9 +264,12 @@ client.on(Events.MessageCreate, async (message) => {
     })
 
     // if this is the first assistant message, send the disclaimer first
-    if (currentMessages.filter(
-      x => x.role === ChatCompletionRequestMessageRoleEnum.Assistant).length === 0 &&
-    DISCLAIMER.length > 0) {
+    if (
+      currentMessages.filter(
+        (x) => x.role === ChatCompletionRequestMessageRoleEnum.Assistant
+      ).length === 0 &&
+      DISCLAIMER.length > 0
+    ) {
       response = DISCLAIMER + '\n\n' + response
     }
 
