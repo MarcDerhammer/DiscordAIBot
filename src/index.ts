@@ -6,10 +6,9 @@ import {
 } from 'openai'
 
 import { Client, Events, GatewayIntentBits } from 'discord.js'
-import { encode } from 'gpt-3-encoder'
 import { getEnv } from './env'
 import { Messages } from './Messages'
-import { OpenAiHelper } from './OpenAiHelper'
+import { countTokens, getMaxTokens, type Model, OpenAiHelper } from './OpenAiHelper'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
@@ -23,7 +22,6 @@ const CHANNEL_IDS = getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
   ? []
   : getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
 
-const MAX_TOKENS_IN_MESSAGES = LANGUAGE_MODEL === 'gpt-3.5-turbo' ? 4096 : 2048
 const ONLY_RESPOND_TO_MENTIONS = getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase() === 'true' ||
   getEnv('ONLY_RESPOND_TO_MENTIONS') === ''
 const IGNORE_BOTS = getEnv('IGNORE_BOTS').toLowerCase() === 'true'
@@ -63,10 +61,6 @@ client.once(Events.ClientReady, () => {
 
 const messages = new Messages(systemMessages)
 
-const countTokens = async (channelId: string): Promise<number> => {
-  return encode(JSON.stringify(await messages.getMessages(channelId))).length
-}
-
 const removeNonAlphanumeric = (input: string): string => {
   return input.replace(/[^a-zA-Z0-9]/g, '').trim()
 }
@@ -91,14 +85,14 @@ client.on(Events.MessageCreate, async (message) => {
     return
   }
 
-  if ((await messages.getMessages(message.channelId)) == null) {
+  if ((messages.getMessages(message.channelId)) == null) {
     console.log(
       'Channel messages is null, ignoring message: ' + message.content
     )
     return
   }
 
-  await messages.addMessage(message.channelId, {
+  messages.addMessage(message.channelId, {
     role: ChatCompletionRequestMessageRoleEnum.User,
     content: message.content,
     name: removeNonAlphanumeric(message.author.username)
@@ -116,7 +110,7 @@ client.on(Events.MessageCreate, async (message) => {
     return
   }
 
-  const existingMessages = await messages.getMessages(message.channelId)
+  const existingMessages = messages.getMessages(message.channelId)
   console.log('Existing messages: ' + existingMessages.length.toString())
 
   if (!message.mentions.has(client.user) && ONLY_RESPOND_TO_MENTIONS) {
@@ -147,7 +141,7 @@ client.on(Events.MessageCreate, async (message) => {
   try {
     console.log('Checking moderation...')
 
-    const currentMessages = await messages.getMessages(message.channelId)
+    const currentMessages = messages.getMessages(message.channelId)
 
     console.log(currentMessages?.map((message) => message.content) ?? [])
 
@@ -158,7 +152,7 @@ client.on(Events.MessageCreate, async (message) => {
 
     if (inappropriate) {
       console.log('Message flagged: ' + message.content)
-      await messages.clearMessages(message.channelId)
+      messages.clearMessages(message.channelId)
       clearInterval(typingInterval)
       await message.reply(MODERATION_VIOLATION)
       return
@@ -169,18 +163,16 @@ client.on(Events.MessageCreate, async (message) => {
     // if our messages are too long, remove oldest ones until we're
     // under the MAX_TOKENS_IN_MESSAGES
     // ignore System messages in this calculation
-    let totalTokens = await countTokens(message.channelId)
-    while (totalTokens > MAX_TOKENS_IN_MESSAGES) {
+    let totalTokens = countTokens(messages.getMessages(message.channelId))
+    while (totalTokens > getMaxTokens(LANGUAGE_MODEL as Model)) {
       console.log('Removing oldest message to make room for new message: ')
-      await messages.removeOldestNonSystemMessage(message.channelId)
-      totalTokens = await countTokens(message.channelId)
+      messages.removeOldestNonSystemMessage(message.channelId)
+      totalTokens = countTokens(messages.getMessages(message.channelId))
       console.log(`Total tokens: ${totalTokens}`)
     }
 
     console.log(
-      `Generating completion using ${(
-        await countTokens(message.channelId)
-      ).toString()} tokens`
+      `Generating completion using ${totalTokens} tokens from history`
     )
 
     let response = await openAiHelper.createChatCompletion(
@@ -192,13 +184,13 @@ client.on(Events.MessageCreate, async (message) => {
     // rules
     if (await openAiHelper.areMessagesInappropriate([response])) {
       console.log('Response flagged: ' + response)
-      await messages.clearMessages(message.channelId)
+      messages.clearMessages(message.channelId)
       clearInterval(typingInterval)
       await message.reply(MODERATION_VIOLATION)
       return
     }
 
-    await messages.addMessage(message.channelId, {
+    messages.addMessage(message.channelId, {
       role: ChatCompletionRequestMessageRoleEnum.Assistant,
       content: response,
       name: removeNonAlphanumeric(client.user.username)
