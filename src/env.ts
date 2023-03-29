@@ -1,11 +1,13 @@
 import dotenv from 'dotenv'
 dotenv.config()
 
-const DEFAULT_ERROR_RESPONSE =
+export const DEFAULT_ERROR_RESPONSE =
   'Sorry, there was an error. Please try again later.'
-const DEFUALT_MODERATION_VIOLATION_RESPONSE =
-  'Some content was detected violating Open AI\'s usage policies. ' +
-  'Chat history has been cleared from future responses.'
+export const DEFAULT_MODERATION_VIOATION_RESPONSE =
+  'Some content in this chat\'s history was detected violating Open AI\'s usage policies. ' +
+  'The offending messages have been cleared from my memory.'
+export const DISCLAIMER = 'This bot uses Open AI\'s GPT API to generate messages.  ' +
+  'Any person or character it may be imitating is a simulation.'
 
 type EnvConfig = Record<string, string | undefined>
 
@@ -15,39 +17,15 @@ interface RequiredEnv {
 }
 
 interface OptionalEnv {
-  LANGUAGE_MODEL?: string
-  ERROR_RESPONSE?: string
-  MODERATION_VIOLATION?: string
-  SYSTEM_MESSAGE?: string
-  BOT_NAME?: string
-  BOT_IMAGE_URL?: string
-  ONLY_RESPOND_TO_MENTIONS?: 'true' | 'false'
-  ONLY_RESPOND_IN_CHANNEL?: string
-  IGNORE_BOTS?: 'true' | 'false'
-  IGNORE_EVERYONE?: 'true' | 'false'
-  DISCLAIMER?: string
-  MAX_TOKENS_PER_MESSAGE?: string
+  GPT3_TOKENS_AVAILABLE_PER_SERVER?: string
+  GPT4_TOKENS_AVAILABLE_PER_SERVER?: string
 }
 
 type Env = RequiredEnv & OptionalEnv
 
 const env: EnvConfig = {
   API_KEY: process.env.OPENAI_API_KEY,
-  DISCORD_TOKEN: process.env.DISCORD_TOKEN,
-  LANGUAGE_MODEL: process.env.LANGUAGE_MODEL ?? 'gpt-3.5-turbo',
-  ERROR_RESPONSE: process.env.ERROR_RESPONSE ?? DEFAULT_ERROR_RESPONSE,
-  MODERATION_VIOLATION:
-    process.env.MODERATION_VIOLATION_RESPONSE ??
-    DEFUALT_MODERATION_VIOLATION_RESPONSE,
-  SYSTEM_MESSAGE: process.env.SYSTEM_MESSAGE,
-  BOT_NAME: process.env.BOT_NAME,
-  BOT_IMAGE_URL: process.env.BOT_IMAGE_URL,
-  ONLY_RESPOND_TO_MENTIONS: process.env.ONLY_RESPOND_TO_MENTIONS ?? 'true',
-  ONLY_RESPOND_IN_CHANNEL: process.env.ONLY_RESPOND_IN_CHANNEL,
-  IGNORE_BOTS: process.env.IGNORE_BOTS ?? 'true',
-  IGNORE_EVERYONE: process.env.IGNORE_EVERYONE ?? 'true',
-  DISCLAIMER: process.env.DISCLAIMER,
-  MAX_TOKENS_PER_MESSAGE: process.env.MAX_TOKENS_PER_MESSAGE
+  DISCORD_TOKEN: process.env.DISCORD_TOKEN
 }
 
 function isRequiredEnv (key: keyof Env): key is keyof RequiredEnv {
