@@ -7,4 +7,5 @@ export interface ChannelConfig {
   IGNORE_EVERYONE_MENTIONS: boolean
   DISCLAIMER: string
   MAX_TOKENS_PER_MESSAGE: number
+  LANGUAGE_MODEL: string
 }

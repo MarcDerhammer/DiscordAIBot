@@ -1,7 +1,9 @@
-import { ChatCompletionRequestMessageRoleEnum, type ChatCompletionRequestMessage } from 'openai'
+import {
+  ChatCompletionRequestMessageRoleEnum,
+  type ChatCompletionRequestMessage
+} from 'openai'
 import { countTokens } from '../OpenAiHelper'
 import { type ChannelConfig } from './ChannelConfig'
-import fs from 'fs'
 
 export class Channel {
   id: string
@@ -20,63 +22,67 @@ export class Channel {
     this.disclaimerSent = disclaimerSent
   }
 
-  async setConfig (config: ChannelConfig): Promise<void> {
+  setConfig (config: ChannelConfig): void {
     this.config = config
-    await this.clearMessages()
-    await this.save()
+    this.clearMessages()
   }
 
-  async addMessage (message: ChatCompletionRequestMessage): Promise<void> {
+  addMessage (message: ChatCompletionRequestMessage): void {
     this.messages.push(message)
     while (countTokens(this.messages) > this.config.MAX_TOKENS_PER_MESSAGE) {
       console.log('Removing message to avoid exceeding max token count')
       // remove the first non-system message
       const index = this.messages.findIndex(
-        (message) => message.role !== ChatCompletionRequestMessageRoleEnum.System)
+        (message) =>
+          message.role !== ChatCompletionRequestMessageRoleEnum.System
+      )
       this.messages.splice(index, 1)
       if (index === -1) {
         // no non-system messages found.. but we still need to break to avoid loop
         throw new Error('System messages are too long')
       }
     }
-    // save this message to file as <id>.json
-    await this.save()
   }
 
-  async clearMessages (): Promise<void> {
+  clearMessages (): void {
     console.log('Clearing conversation for channel: ' + this.id)
     // await all of these to run in parallel
-    await Promise.all([
-      this.removeMessagesByType(ChatCompletionRequestMessageRoleEnum.User),
-      this.removeMessagesByType(ChatCompletionRequestMessageRoleEnum.Assistant),
-      this.removeMessagesByType(ChatCompletionRequestMessageRoleEnum.System)
-    ])
+
+    this.removeMessagesByType(ChatCompletionRequestMessageRoleEnum.User)
+    this.removeMessagesByType(ChatCompletionRequestMessageRoleEnum.Assistant)
+    this.removeMessagesByType(ChatCompletionRequestMessageRoleEnum.System)
   }
 
-  async removeMessagesByType (role: ChatCompletionRequestMessageRoleEnum): Promise<void> {
-    this.messages = [...this.messages.filter(
-      (message) => message.role !== role)]
+  removeMessagesByType (
+    role: ChatCompletionRequestMessageRoleEnum
+  ): void {
+    this.messages = [
+      ...this.messages.filter((message) => message.role !== role)
+    ]
 
-    if (role === ChatCompletionRequestMessageRoleEnum.System &&
-            this.config.DEFAULT_SYSTEM_MESSAGE.length > 0) {
-      await this.addMessage({
+    if (
+      role === ChatCompletionRequestMessageRoleEnum.System &&
+      this.config.DEFAULT_SYSTEM_MESSAGE.length > 0
+    ) {
+      this.addMessage({
         content: this.config.DEFAULT_SYSTEM_MESSAGE,
         role: ChatCompletionRequestMessageRoleEnum.System
       })
     }
   }
 
-  async save (): Promise<void> {
-    await new Promise((resolve, reject) => {
-      // write files to a folder called 'channels'
+  static load (json: string): Channel {
+    try {
+      const jsonObj = JSON.parse(json)
 
-      fs.writeFile(`./channels/${this.id}.json`, JSON.stringify(this), (err) => {
-        if (err != null) {
-          reject(err)
-        } else {
-          resolve(true)
-        }
-      })
-    })
+      const channel = new Channel(jsonObj.id, jsonObj.config)
+      channel.messages = jsonObj.messages
+      channel.disclaimerSent = jsonObj.disclaimerSent
+
+      return channel
+    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`Error loading Channel from JSON: ${e.message}`)
+    }
   }
 }

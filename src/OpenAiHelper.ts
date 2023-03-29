@@ -6,24 +6,50 @@ export const countTokens = (messages: ChatCompletionRequestMessage[]): number =>
 }
 
 export class OpenAiHelper {
-  private readonly languageModel: string
   private readonly openai: OpenAIApi
-  constructor (openai: OpenAIApi, languageModel: string) {
+  constructor (openai: OpenAIApi) {
     this.openai = openai
-    this.languageModel = languageModel
   }
 
-  async areMessagesInappropriate (messages: string[]): Promise<boolean> {
+  /**
+   * Searches the messages for moderation violations
+   * @param messages the messages to check for moderation violations
+   * @returns the indices of the messages that are inappropriate
+   */
+  async findModerationIndices (messages: string[]): Promise<number[]> {
     const moderation = await this.openai.createModeration({ input: messages })
-    return moderation.data.results.find((result) => result.flagged) != null
+    if (moderation.status !== 200) {
+      throw new Error(
+        'OpenAI API returned status code ' + moderation.status.toString()
+      )
+    }
+
+    // print the violating messages to console
+    moderation.data.results.forEach((result, index) => {
+      if (result.flagged) {
+        console.log('Message "' + messages[index] + '" is flagged')
+      }
+    })
+
+    // find the indices of the messages that are inappropriate
+    const flaggedIndices = moderation.data.results
+      .map((result, index) => {
+        if (result.flagged) {
+          return index
+        }
+        return -1
+      })
+      .filter(index => index !== -1)
+    return flaggedIndices
   }
 
   async createChatCompletion (
     messages: ChatCompletionRequestMessage[],
+    languageModel: string,
     user?: string,
     totalMaxTokens?: number
   ): Promise<string> {
-    const MAX_TOKEN_COUNT = getMaxTokens(this.languageModel as Model, totalMaxTokens) -
+    const MAX_TOKEN_COUNT = getMaxTokens(languageModel as Model, totalMaxTokens) -
       countTokens(messages)
 
     if (MAX_TOKEN_COUNT <= 0) {
@@ -33,7 +59,7 @@ export class OpenAiHelper {
     console.log('Max tokens: ' + MAX_TOKEN_COUNT.toString())
 
     const response = await this.openai.createChatCompletion({
-      model: this.languageModel,
+      model: languageModel,
       messages,
       user,
       max_tokens: MAX_TOKEN_COUNT

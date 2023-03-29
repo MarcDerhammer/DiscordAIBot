@@ -1,3 +1,5 @@
 # ignore all .env files
 *.env
-channels/*
+node_modules
+data
+data/*

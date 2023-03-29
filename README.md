@@ -201,7 +201,7 @@ These are the list of environment variables you can set to configure the bot.
 ### Optional
 - `SYSTEM_MESSAGE`: The initial prompt to use with the bot, sent as a "system" message. Example: `You are the Master Chief from Halo. Stay in character as much as possible` You can also set or clear system messages with the `/system` and `/reset` command (see above)
 - `ERROR_RESPONSE`: The message the bot will send when there's an error in processing the user's input. These appear when there's some sort of error. See the logs for information. Default: `Sorry, there was an error. Please try again later.`
-- `MODERATION_VIOLATION_RESPONSE`: The message the bot will send when a user's input violates OpenAI's moderation policy. It should probably also mention that the chat history will stop being processed before this point.  Default: `Some content was detected violating Open AI's usage policies. Chat history has been cleared from future responses.`
+- `MODERATION_VIOLATION_RESPONSE`: The message the bot will send when a user's input violates OpenAI's moderation policy. It should probably also mention that the chat history will stop being processed before this point.  Default: `Some content in this chat's history was detected violating Open AI's usage policies. Chat history has been cleared from future responses.`
 - `LANGUAGE_MODEL`: The OpenAI language model you wish to use.  Defaults to `gpt-3.5-turbo`.
 - `BOT_NAME`: A custom name for your bot. You can also set this in the [Discord Developer Portal](https://discord.com/developers/applications)
 - `BOT_IMAGE_URL`: A URL for a custom image to represent your bot. Also can be set in the [Discord Developer Portal](https://discord.com/developers/applications)

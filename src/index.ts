@@ -4,50 +4,22 @@ import {
   OpenAIApi
 } from 'openai'
 
-import {
-  Client,
-  Events,
-  GatewayIntentBits
-} from 'discord.js'
+import { Client, Events, GatewayIntentBits } from 'discord.js'
 import { getEnv } from './env'
 
-import {
-  OpenAiHelper
-} from './OpenAiHelper'
-import { Channel } from './messages/Channel'
+import { countTokens, OpenAiHelper } from './OpenAiHelper'
+import fs from 'fs'
+import { DEFAULT_GUILD_CONFIG, Guild, GUILD_DIRECTORY } from './messages/Guild'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
-const LANGUAGE_MODEL = getEnv('LANGUAGE_MODEL')
-const ERROR_RESPONSE = getEnv('ERROR_RESPONSE')
-const MODERATION_VIOLATION = getEnv('MODERATION_VIOLATION')
-const SYSTEM_MESSAGE = getEnv('SYSTEM_MESSAGE')
-const BOT_NAME = getEnv('BOT_NAME')
-const BOT_IMAGE_URL = getEnv('BOT_IMAGE_URL')
-const CHANNEL_IDS =
-  getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
-    ? []
-    : getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
-
-const ONLY_RESPOND_TO_MENTIONS =
-  getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase() === 'true' ||
-  getEnv('ONLY_RESPOND_TO_MENTIONS') === ''
-const IGNORE_BOTS = getEnv('IGNORE_BOTS').toLowerCase() === 'true'
-const IGNORE_EVERYONE = getEnv('IGNORE_EVERYONE').toLowerCase() === 'true'
-const DISCLAIMER = getEnv('DISCLAIMER')
-
-const TOTAL_MAX_TOKENS =
-  getEnv('MAX_TOKENS_PER_MESSAGE') !== ''
-    ? parseInt(getEnv('MAX_TOKENS_PER_MESSAGE'), 10)
-    : undefined
 
 const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
     new Configuration({
       apiKey: API_KEY
     })
-  ),
-  LANGUAGE_MODEL
+  )
 )
 const client = new Client({
   intents: [
@@ -65,11 +37,25 @@ const client = new Client({
 //   PermissionFlagsBits.ModerateMembers
 // ]
 
+// const channels = new Map<string, Channel>()
+const guilds = new Map<string, Guild>()
+
 client.once(Events.ClientReady, async () => {
-  console.log(
-    `Ready!  Using model: ${LANGUAGE_MODEL} and system message ` +
-      `${SYSTEM_MESSAGE}`
-  )
+  console.log('Ready!')
+
+  if (!fs.existsSync(GUILD_DIRECTORY)) {
+    fs.mkdirSync(GUILD_DIRECTORY)
+  }
+
+  // iterate over all files in the channels directory and load them
+  const files = fs.readdirSync(GUILD_DIRECTORY)
+  for (const file of files) {
+    const filePath = `${GUILD_DIRECTORY}/${file}`
+    const fileContent = fs.readFileSync(filePath, 'utf-8')
+
+    const guild = await Guild.load(fileContent)
+    guilds.set(guild.id, guild)
+  }
   // await client.application?.commands.create({
   //   name: 'reset',
   //   description: 'Reset the current conversation',
@@ -232,40 +218,32 @@ client.once(Events.ClientReady, async () => {
 
 // create a Map where the key is channelId and the value is the Channel
 
-const channels = new Map<string, Channel>()
-
 client.on(Events.MessageCreate, async (message) => {
+  if (message.guildId == null) return
   if (client.user?.id == null || message.channelId == null) return
   if (message.author.id === client.user.id) return
-  if (CHANNEL_IDS != null && CHANNEL_IDS.length > 0 && !CHANNEL_IDS.includes(message.channelId)) {
-    return
-  }
 
   console.log(message.author.username + ': ' + message.content)
 
-  let channel = channels.get(message.channelId)
-
-  if (channel == null) {
-    console.log('Channel not found, creating new one')
-    channel = new Channel(message.channelId, {
-      ERROR_RESPONSE,
-      MODERATION_VIOLATION,
-      DEFAULT_SYSTEM_MESSAGE: SYSTEM_MESSAGE,
-      ONLY_RESPOND_TO_MENTIONS,
-      IGNORE_BOTS,
-      IGNORE_EVERYONE_MENTIONS: IGNORE_EVERYONE,
-      MAX_TOKENS_PER_MESSAGE:
-        (TOTAL_MAX_TOKENS != null) ? TOTAL_MAX_TOKENS : Number.MAX_SAFE_INTEGER,
-      DISCLAIMER
-    })
-    channels.set(message.channelId, channel)
+  let guild = guilds.get(message.guildId)
+  if (guild == null) {
+    console.log('Guild not found, creating new one')
+    guild = new Guild(message.guildId, DEFAULT_GUILD_CONFIG)
+    guilds.set(message.guildId, guild)
   }
 
-  await channel.addMessage({
+  const channel = await guild.getChannel(message.channelId)
+
+  if (channel == null) {
+    throw new Error('Channel not found')
+  }
+
+  channel.addMessage({
     role: ChatCompletionRequestMessageRoleEnum.User,
     content: message.content,
     name: message.author.id.toString()
   })
+  await guild.save()
 
   // also ignore @everyone or role mentions
   if (
@@ -284,7 +262,10 @@ client.on(Events.MessageCreate, async (message) => {
 
   console.log('Existing messages: ' + channel.messages.length.toString())
 
-  if (!message.mentions.has(client.user) && channel.config.ONLY_RESPOND_TO_MENTIONS) {
+  if (
+    !message.mentions.has(client.user) &&
+    channel.config.ONLY_RESPOND_TO_MENTIONS
+  ) {
     console.log('Message does not mention bot, ignoring')
     return
   }
@@ -312,13 +293,18 @@ client.on(Events.MessageCreate, async (message) => {
     console.log('Checking moderation...')
 
     // ensure the message is appropriate
-    const inappropriate = await openAiHelper.areMessagesInappropriate(
+    const badIndices = await openAiHelper.findModerationIndices(
       channel.messages.map((message) => message.content)
     )
 
-    if (inappropriate) {
-      console.log('Message flagged: ' + message.content)
-      await channel.clearMessages()
+    if (badIndices.length > 0) {
+      // remove any messages that were flagged
+      badIndices
+        .sort((a, b) => b - a)
+        .forEach((index) => {
+          channel.messages.splice(index, 1)
+        })
+      await guild.save()
       clearInterval(typingInterval)
       await message.reply(channel.config.MODERATION_VIOLATION)
       return
@@ -326,27 +312,49 @@ client.on(Events.MessageCreate, async (message) => {
 
     console.log('Generating completion... messages in history')
 
+    // subtract from the guild's token count
+    if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
+      try {
+        await guild.subtractGpt3Tokens(countTokens(channel.messages))
+      } catch (error) {
+        console.error(error)
+        await message.reply('Sorry, you have run out of GPT-4 tokens')
+        clearInterval(typingInterval)
+        return
+      }
+    } else {
+      try {
+        await guild.subtractGpt3Tokens(countTokens(channel.messages))
+      } catch (error) {
+        console.error(error)
+        await message.reply('Sorry, you have run out of GPT-3 tokens')
+        clearInterval(typingInterval)
+        return
+      }
+    }
+
     let response = await openAiHelper.createChatCompletion(
       channel.messages ?? [],
-      message.author.id,
-      TOTAL_MAX_TOKENS
+      channel.config.LANGUAGE_MODEL,
+      message.author.id
     )
 
     // let's ensure our own response doesn't violate any moderation
     // rules
-    if (await openAiHelper.areMessagesInappropriate([response])) {
+    if ((await openAiHelper.findModerationIndices([response])).length > 0) {
       console.log('Response flagged: ' + response)
-      await channel.clearMessages()
       clearInterval(typingInterval)
       await message.reply(channel.config.MODERATION_VIOLATION)
       return
     }
 
-    await channel.addMessage({
+    channel.addMessage({
       role: ChatCompletionRequestMessageRoleEnum.Assistant,
       content: response,
       name: client.user.id.toString()
     })
+
+    await guild.save()
 
     console.log('Response: ' + response)
 
@@ -391,20 +399,13 @@ client
   .then(async () => {
     console.log('Logged in!')
     // print how many servers we're in
-    console.log(`Connected to ${client.guilds.cache.size} ` +
-    `server(s) with ${client.guilds.cache.reduce((a, g) => a + g.memberCount, 0)} user(s)`)
-    // set the name and image (if defined)
-    // and if the name is not the same as the current name, change it
-    if (BOT_NAME.length > 0 && BOT_NAME !== client.user?.username) {
-      console.log('Setting bot name to: ' + BOT_NAME)
-      await client.user?.edit({ username: BOT_NAME })
-    }
-
-    // do the same for the bot image
-    if (BOT_IMAGE_URL.length > 0 && BOT_IMAGE_URL !== client.user?.avatar) {
-      console.log('Setting bot image to: ' + BOT_IMAGE_URL)
-      await client.user?.setAvatar(BOT_IMAGE_URL)
-    }
+    console.log(
+      `Connected to ${client.guilds.cache.size} ` +
+        `server(s) with ${client.guilds.cache.reduce(
+          (a, g) => a + g.memberCount,
+          0
+        )} user(s)`
+    )
   })
   .catch((e) => {
     console.error(e)

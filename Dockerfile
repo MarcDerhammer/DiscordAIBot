@@ -12,6 +12,8 @@ ENV BOT_IMAGE_URL=
 ENV ONLY_RESPOND_TO_MENTIONS=true
 ENV ONLY_RESPOND_IN_CHANNEL=
 
+VOLUME [ "/data" ]
+
 # Create app directory
 WORKDIR /usr/src/app
 # Install app dependencies
