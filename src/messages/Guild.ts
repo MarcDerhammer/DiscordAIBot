@@ -19,10 +19,12 @@ export const DEFAULT_GUILD_CONFIG: ChannelConfig = {
 const GPT3_TOKENS_AVAILABLE = 2000000
 const GPT4_TOKENS_AVAILABLE = 80000
 
+const isRunningInDocker = (): boolean => {
+  return fs.existsSync('/.dockerenv')
+}
+
 export const GUILD_DIRECTORY =
-    // if we're in docker, it's just /data/guilds
-    // otherwise, it's ./data/guilds
-    (process.env.DOCKER != null) ? '/data/guilds' : './data/guilds'
+    isRunningInDocker() ? '/data/guilds' : './data/guilds'
 
 export class Guild {
   id: string
