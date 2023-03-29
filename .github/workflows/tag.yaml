@@ -3,7 +3,7 @@ name: "Publish new release"
 on:
   pull_request:
     branches:
-      - master
+      - main
     types:
       - closed
 
@@ -48,11 +48,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          head: master
-          base: dev
-          title: Merge master into dev branch
+          head: main
+          base: develop
+          title: Merge main into dev branch
           body: |
-            This PR merges the master branch back into dev.
+            This PR merges the main branch back into develop.
             This happens to ensure that the updates that happend on the release branch, i.e. CHANGELOG and manifest updates are also present on the dev branch.
 
       # if needed, you can checkout the latest master here, build artifacts and publish / deploy them somewhere
