@@ -7,7 +7,8 @@ import {
 
 import {
   Client, type CommandInteraction,
-  Events, GatewayIntentBits
+  Events, GatewayIntentBits,
+  type TextChannel
 } from 'discord.js'
 import { getEnv } from './env'
 
@@ -17,6 +18,8 @@ import { DEFAULT_GUILD_CONFIG, Guild, GUILD_DIRECTORY } from './messages/Guild'
 import { type ChannelConfig } from './messages/ChannelConfig'
 import { Channel } from './messages/Channel'
 import RegisterCommands from './commands/RegisterCommands'
+import generateCheckout, { handleWebHook } from './stripe/Checkout'
+import express from 'express'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
@@ -38,6 +41,28 @@ const client = new Client({
 
 // const channels = new Map<string, Channel>()
 const guilds = new Map<string, Guild>()
+
+const app = express()
+const port = 3005
+app.post('/stripe', async (req, res) => {
+  const result = await handleWebHook(req, guilds)
+  
+  res.send('Success')
+  return result
+  // const result = await handleWebHook(req, guilds)
+
+  // if (!result.success) {
+  //   res.status(500).send('Error')
+  //   // return
+  // }
+
+  // // get the channel and send a message
+  // const channel = await client.channels.fetch(result.channelId)
+  // if (channel instanceof TextChannel) {
+  //   await channel.send('Thank you for your purchase!')
+  // }
+  // res.send('Success')
+})
 
 client.once(Events.ClientReady, async () => {
   console.log('Ready!')
@@ -150,9 +175,16 @@ commands.set('tokens', async (interaction) => {
   const gpt3Tokens = guild.gpt3TokensAvailable.toLocaleString()
   const gpt4Tokens = guild.gpt4TokensAvailable.toLocaleString()
 
+  const tokenUrl = await generateCheckout(
+    interaction.guildId,
+    interaction.guild?.name ?? '',
+    interaction.user.id,
+    interaction.channelId
+  )
+
   await interaction.reply({
     content: `Tokens Remaining: \nGPT-3: ${gpt3Tokens}` +
-      `\nGPT-4: ${gpt4Tokens}`,
+      `\nGPT-4: ${gpt4Tokens}\n\n[Buy more tokens for this server](${tokenUrl})`,
     ephemeral: true
   })
 })
@@ -304,9 +336,11 @@ client.on(Events.MessageCreate, async (message) => {
   const channel = await guild.getChannel(message.channelId)
 
   if (channel == null) {
-    await message.reply(
-      'This channel is not configured for chatting with me.  ' +
-      'Someone with permissions needs to run `/config` to configure this channel.')
+    if (message.mentions.users.has(client.user.id)) {
+      await message.reply(
+        'This channel is not configured for chatting with me.  ' +
+        'Someone with permissions needs to run `/config` to configure this channel.')
+    }
     return
   }
 
@@ -482,3 +516,9 @@ client
   .catch((e) => {
     console.error(e)
   })
+
+// add express endpoint to handle stripe payments
+
+app.listen(port, () => {
+  console.log(`Example app listening at http://localhost:${port}`)
+})
