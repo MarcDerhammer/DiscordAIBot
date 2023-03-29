@@ -7,14 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2023-03-29
+
 Initial Release (sort of)
 
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/2.0.1...HEAD
 
-
-
-
-
-
-
-
-
+[2.0.1]: https://github.com/MarcDerhammer/DiscordAIBot/compare/e460378cabff0f4d3a7cf4af4f076cc1f413404d...2.0.1
