@@ -8,7 +8,6 @@ export const DEFAULT_GUILD_CONFIG: ChannelConfig = {
   MAX_TOKENS_PER_MESSAGE: Number.MAX_SAFE_INTEGER,
   ERROR_RESPONSE: 'Sorry, there was an error. Please try again later.',
   MODERATION_VIOLATION: DEFAULT_MODERATION_VIOATION_RESPONSE,
-  DEFAULT_SYSTEM_MESSAGE: '',
   ONLY_RESPOND_TO_MENTIONS: true,
   IGNORE_BOTS: true,
   IGNORE_EVERYONE_MENTIONS: true,
@@ -44,8 +43,8 @@ export class Guild {
 
   async getChannel (id: string): Promise<Channel | undefined> {
     if (!this.channels.has(id)) {
-      this.channels.set(id, new Channel(id, this.defaultConfig))
-      await this.save()
+      console.error('Channel not found')
+      return undefined
     }
     return this.channels.get(id)
   }

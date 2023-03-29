@@ -29,6 +29,7 @@ export class Channel {
 
   addMessage (message: ChatCompletionRequestMessage): void {
     this.messages.push(message)
+
     while (countTokens(this.messages) > this.config.MAX_TOKENS_PER_MESSAGE) {
       console.log('Removing message to avoid exceeding max token count')
       // remove the first non-system message
@@ -59,16 +60,6 @@ export class Channel {
     this.messages = [
       ...this.messages.filter((message) => message.role !== role)
     ]
-
-    if (
-      role === ChatCompletionRequestMessageRoleEnum.System &&
-      this.config.DEFAULT_SYSTEM_MESSAGE.length > 0
-    ) {
-      this.addMessage({
-        content: this.config.DEFAULT_SYSTEM_MESSAGE,
-        role: ChatCompletionRequestMessageRoleEnum.System
-      })
-    }
   }
 
   static load (json: string): Channel {
