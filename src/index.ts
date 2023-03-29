@@ -1,64 +1,32 @@
 import {
-  type ChatCompletionRequestMessage,
   ChatCompletionRequestMessageRoleEnum,
+  ChatCompletionResponseMessageRoleEnum,
   Configuration,
   OpenAIApi
 } from 'openai'
 
 import {
-  Client,
-  type CommandInteraction,
-  Events,
-  GatewayIntentBits,
-  PermissionFlagsBits,
-  TextInputBuilder,
-  ActionRowBuilder,
-  ModalBuilder,
-  TextInputStyle,
-  ButtonBuilder,
-  ButtonStyle
+  Client, type CommandInteraction,
+  Events, GatewayIntentBits
 } from 'discord.js'
 import { getEnv } from './env'
-import { Messages } from './Messages'
-import {
-  countTokens,
-  getMaxTokens,
-  type Model,
-  OpenAiHelper
-} from './OpenAiHelper'
+
+import { countTokens, OpenAiHelper } from './OpenAiHelper'
+import fs from 'fs'
+import { DEFAULT_GUILD_CONFIG, Guild, GUILD_DIRECTORY } from './messages/Guild'
+import { type ChannelConfig } from './messages/ChannelConfig'
+import { Channel } from './messages/Channel'
+import RegisterCommands from './commands/RegisterCommands'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
-const LANGUAGE_MODEL = getEnv('LANGUAGE_MODEL')
-const ERROR_RESPONSE = getEnv('ERROR_RESPONSE')
-const MODERATION_VIOLATION = getEnv('MODERATION_VIOLATION')
-const SYSTEM_MESSAGE = getEnv('SYSTEM_MESSAGE')
-const BOT_NAME = getEnv('BOT_NAME')
-const BOT_IMAGE_URL = getEnv('BOT_IMAGE_URL')
-const CHANNEL_IDS =
-  getEnv('ONLY_RESPOND_IN_CHANNEL') === ''
-    ? []
-    : getEnv('ONLY_RESPOND_IN_CHANNEL').split(',')
-
-const ONLY_RESPOND_TO_MENTIONS =
-  getEnv('ONLY_RESPOND_TO_MENTIONS').toLowerCase() === 'true' ||
-  getEnv('ONLY_RESPOND_TO_MENTIONS') === ''
-const IGNORE_BOTS = getEnv('IGNORE_BOTS').toLowerCase() === 'true'
-const IGNORE_EVERYONE = getEnv('IGNORE_EVERYONE').toLowerCase() === 'true'
-const DISCLAIMER = getEnv('DISCLAIMER')
-
-const TOTAL_MAX_TOKENS =
-  getEnv('MAX_TOKENS_PER_MESSAGE') !== ''
-    ? parseInt(getEnv('MAX_TOKENS_PER_MESSAGE'), 10)
-    : undefined
 
 const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
     new Configuration({
       apiKey: API_KEY
     })
-  ),
-  LANGUAGE_MODEL
+  )
 )
 const client = new Client({
   intents: [
@@ -68,157 +36,235 @@ const client = new Client({
   ]
 })
 
-const COMMAND_PERMISSIONS = [
-  PermissionFlagsBits.Administrator,
-  PermissionFlagsBits.ManageMessages,
-  PermissionFlagsBits.ManageChannels,
-  PermissionFlagsBits.ManageGuild,
-  PermissionFlagsBits.ModerateMembers
-]
+// const channels = new Map<string, Channel>()
+const guilds = new Map<string, Guild>()
 
 client.once(Events.ClientReady, async () => {
-  console.log(
-    `Ready!  Using model: ${LANGUAGE_MODEL} and system message ` +
-      `${SYSTEM_MESSAGE}`
-  )
-  await client.application?.commands.create({
-    name: 'reset',
-    description: 'Reset the current conversation',
-    defaultMemberPermissions: COMMAND_PERMISSIONS
-  })
-  await client.application?.commands.create({
-    name: 'system',
-    description: 'Add a system message',
-    defaultMemberPermissions: COMMAND_PERMISSIONS
-  })
+  console.log('Ready!')
+
+  // register commands
+  await RegisterCommands(client)
+
+  if (!fs.existsSync(GUILD_DIRECTORY)) {
+    fs.mkdirSync(GUILD_DIRECTORY)
+  }
+
+  // iterate over all files in the channels directory and load them
+  const files = fs.readdirSync(GUILD_DIRECTORY)
+  for (const file of files) {
+    const filePath = `${GUILD_DIRECTORY}/${file}`
+    const fileContent = fs.readFileSync(filePath, 'utf-8')
+
+    const guild = await Guild.load(fileContent)
+    guilds.set(guild.id, guild)
+  }
 })
 
-// register commands to the their handlers
+// // register commands to the their handlers
 const commands = new Map<
 string,
 (interaction: CommandInteraction) => Promise<void>
 >()
-commands.set('reset', async (interaction) => {
-  const row = new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('reset_all')
-        .setLabel('Clear All')
-        .setStyle(ButtonStyle.Danger)
-    )
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('reset_user')
-        .setLabel('Clear User Messages')
-        .setStyle(ButtonStyle.Danger)
-    )
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('reset_system')
-        .setLabel('Clear System Messages')
-        .setStyle(ButtonStyle.Danger)
-    )
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('reset_bot_messages')
-        .setLabel('Clear Bot Messages')
-        .setStyle(ButtonStyle.Danger)
-    )
+commands.set('config', async (interaction) => {
+  if (interaction.guildId == null) {
+    await interaction.reply({
+      content: 'This command can only be used in a server',
+      ephemeral: true
+    })
+    return
+  }
+  // pull out the options
+  const onlyMentions = interaction.options.get('only_mentions')?.value as boolean ?? true
+  const ignoreBots = interaction.options.get('ignore_bots')?.value as boolean ?? true
+  const ignoreEveryoneMentions =
+    interaction.options.get('ignore_everyone_mentions')?.value as boolean ?? true
+  const languageModel = interaction.options.get('language_model')?.value as string ??
+     'gpt-3.5-turbo'
+
+  const configPartial: Partial<ChannelConfig> = {
+    ONLY_RESPOND_TO_MENTIONS: onlyMentions ?? true,
+    IGNORE_BOTS: ignoreBots,
+    IGNORE_EVERYONE_MENTIONS: ignoreEveryoneMentions,
+    LANGUAGE_MODEL: languageModel
+  }
+
+  console.log('Configuring channel: ' + interaction.channelId)
+  console.log('Config: ' + JSON.stringify(configPartial))
+
+  // get the guild
+  let guild = guilds.get(interaction.guildId)
+
+  // if the guild doesn't exist, create it
+  if (guild == null) {
+    guild = new Guild(interaction.guildId, DEFAULT_GUILD_CONFIG)
+    guilds.set(interaction.guildId, guild)
+  }
+
+  // get the channel config
+  let channel = guild.channels.get(interaction.channelId)
+  // update the channel config
+  if (channel == null) {
+    const channelConfig = {
+      ...DEFAULT_GUILD_CONFIG,
+      ...configPartial
+    }
+    channel = new Channel(interaction.channelId, channelConfig)
+    guild.channels.set(interaction.channelId, channel)
+    await guild.save()
+  } else {
+    channel.config = {
+      ...channel.config,
+      ...configPartial
+    }
+    await guild.save()
+  }
+  await interaction.reply({
+    content: 'Channel configured with the following settings: \n' +
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      `\`ONLY_RESPOND_TO_MENTIONS\`: ${channel.config.ONLY_RESPOND_TO_MENTIONS}\n` +
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      `\`IGNORE_BOTS\`: ${channel.config.IGNORE_BOTS}\n` +
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      `\`IGNORE_EVERYONE_MENTIONS\`: ${channel.config.IGNORE_EVERYONE_MENTIONS}\n` +
+      `\`LANGUAGE_MODEL\`: ${channel.config.LANGUAGE_MODEL}`
+  })
+})
+
+commands.set('tokens', async (interaction) => {
+  if (interaction.guildId == null) {
+    await interaction.reply({
+      content: 'This command can only be used in a server',
+      ephemeral: true
+    })
+    return
+  }
+  const guild = guilds.get(interaction.guildId)
+  if (guild == null) {
+    await interaction.reply({
+      content: 'This server does not have any configuration',
+      ephemeral: true
+    })
+    return
+  }
+  // format the numbers in a nice way
+  const gpt3Tokens = guild.gpt3TokensAvailable.toLocaleString()
+  const gpt4Tokens = guild.gpt4TokensAvailable.toLocaleString()
 
   await interaction.reply({
-    content: 'Reset this conversation? This will remove the messages from my memory.',
-    // @ts-expect-error this is fine
-    components: [row]
+    content: `Tokens Remaining: \nGPT-3: ${gpt3Tokens}` +
+      `\nGPT-4: ${gpt4Tokens}`,
+    ephemeral: true
+  })
+})
+
+commands.set('reset', async (interaction) => {
+  if (interaction.guildId == null) {
+    await interaction.reply({
+      content: 'This command can only be used in a server',
+      ephemeral: true
+    })
+    return
+  }
+  const guild = guilds.get(interaction.guildId)
+  if (guild == null) {
+    await interaction.reply({
+      content: 'This server does not have any configuration',
+      ephemeral: true
+    })
+    return
+  }
+  const channel = guild.channels.get(interaction.channelId)
+  if (channel == null) {
+    await interaction.reply({
+      content: 'This channel does not have any configuration',
+      ephemeral: true
+    })
+    return
+  }
+
+  const type = interaction.options.get('reset_type')?.value as string
+
+  if (type == null) {
+    await interaction.reply({
+      content: 'Please specify a reset type',
+      ephemeral: true
+    })
+    return
+  }
+
+  if (type === 'all') {
+    channel.clearMessages()
+  }
+
+  if (type === 'user') {
+    channel.removeMessagesByType(ChatCompletionResponseMessageRoleEnum.User)
+  }
+  if (type === 'bot') {
+    channel.removeMessagesByType(ChatCompletionResponseMessageRoleEnum.Assistant)
+  }
+  if (type === 'system') {
+    channel.removeMessagesByType(ChatCompletionResponseMessageRoleEnum.System)
+  }
+  await interaction.reply({
+    content: `${type.toUpperCase()} messages have been cleared by <@${interaction.user.id}>`
   })
 })
 
 commands.set('system', async (interaction) => {
-  const modal = new ModalBuilder()
-    .setTitle('Add a system message')
-    .setCustomId('add_system_message')
-
-  const systemMessageInput = new TextInputBuilder()
-    .setCustomId('system_message')
-    .setPlaceholder(
-      'Enter a system message. This will be sent as a "system" message to the bot.'
-    )
-    .setLabel('System message')
-    .setStyle(TextInputStyle.Paragraph)
-
-  const firstActionRow = new ActionRowBuilder().addComponents(
-    systemMessageInput
-  )
-
-  // @ts-expect-error this is fine
-  modal.addComponents(firstActionRow)
-
-  // prompt user for the system message
-  // add another command prompt for the system message
-  await interaction.showModal(modal)
-})
-
-client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isButton()) {
+  if (interaction.guildId == null) {
+    await interaction.reply({
+      content: 'This command can only be used in a server',
+      ephemeral: true
+    })
     return
   }
-
-  if (interaction.customId === 'reset_all') {
-    const groupId = interaction.channelId.toString()
-    messages.clearMessages(groupId)
+  const guild = guilds.get(interaction.guildId)
+  if (guild == null) {
     await interaction.reply({
-      content: `The conversation was reset by <@${interaction.user.id}>`
+      content: 'This server does not have any configuration',
+      ephemeral: true
     })
-  }
-  if (interaction.customId === 'reset_user') {
-    const groupId = interaction.channelId.toString()
-    messages.removeAllUserMessages(groupId)
-    await interaction.reply({
-      content: `The user messages were reset by <@${interaction.user.id}>`
-    })
-  }
-  if (interaction.customId === 'reset_system') {
-    const groupId = interaction.channelId.toString()
-    messages.removeAllSystemMessages(groupId)
-    await interaction.reply({
-      content: `The system messages were reset by <@${interaction.user.id}>`
-    })
-  }
-  if (interaction.customId === 'reset_bot_messages') {
-    const groupId = interaction.channelId.toString()
-    messages.removeAllBotMessages(groupId)
-    await interaction.reply({
-      content: `The bot messages were reset by <@${interaction.user.id}>`
-    })
-  }
-})
-
-client.on(Events.InteractionCreate, async (interaction) => {
-  if (
-    !interaction.isModalSubmit() ||
-    interaction.customId.length === 0 ||
-    interaction.channelId == null
-  ) {
     return
   }
-
-  if (interaction.customId === 'add_system_message') {
-    const groupId = interaction.channelId.toString()
-    const systemMessage = interaction.fields.getTextInputValue('system_message')
-    if (systemMessage == null) {
-      await interaction.reply({
-        content: 'System message is null, ignoring',
-        ephemeral: true
-      })
-      return
-    }
-    messages.addMessage(groupId, {
-      role: ChatCompletionRequestMessageRoleEnum.System,
-      content: systemMessage
-    })
+  const channel = guild.channels.get(interaction.channelId)
+  if (channel == null) {
     await interaction.reply({
-      content: `<@${interaction.user.id}> added a system message: ${systemMessage}`
+      content: 'This channel does not have any configuration. Run `/config`',
+      ephemeral: true
     })
+    return
   }
+  const message = interaction.options.get('message')?.value as string
+
+  // if the subcommand was list, list the system messages
+  // @ts-expect-error - this is a bug in the types
+  const list = interaction.options.getSubcommand() === 'list'
+
+  if (list) {
+    const messages =
+      channel.messages.filter((x) => x.role === ChatCompletionResponseMessageRoleEnum.System)
+    const messageList = messages.map((m) => m.content).join('\n')
+    await interaction.reply({
+      content: `System messages: \n${messageList}`
+    })
+    return
+  }
+  if (message == null) {
+    await interaction.reply({
+      content: 'Please provide a message',
+      ephemeral: true
+    })
+    return
+  }
+  const systemMessage = {
+    content: message,
+    role: ChatCompletionResponseMessageRoleEnum.System,
+    name: client.user?.id
+  }
+  channel.addMessage(systemMessage)
+  await interaction.reply({
+    content: `System message added by <@${interaction.user.id}>: \n${message}`
+  })
 })
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -234,76 +280,64 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } catch (error) {
       console.error(error)
       await interaction.reply({
-        content: ERROR_RESPONSE,
+        content: 'An error occurred while processing this command',
         ephemeral: true
       })
     }
   }
 })
 
-const messages = new Messages(SYSTEM_MESSAGE.length > 0
-  ? [{
-      role: ChatCompletionRequestMessageRoleEnum.System,
-      content: SYSTEM_MESSAGE
-    }]
-  : [])
-
-const removeNonAlphanumeric = (input: string): string => {
-  return input.replace(/[^a-zA-Z0-9]/g, '').trim()
-}
-
 client.on(Events.MessageCreate, async (message) => {
-  if (client.user?.id == null || message.channelId == null) {
-    console.log('Client user or channel id is null, ignoring message')
+  if (message.guildId == null) return
+  if (client.user?.id == null || message.channelId == null) return
+  if (message.author.id === client.user.id) return
+
+  console.log(message.author.username + ': ' + message.content)
+
+  let guild = guilds.get(message.guildId)
+  if (guild == null) {
+    console.log('Guild not found, creating new one')
+    guild = new Guild(message.guildId, DEFAULT_GUILD_CONFIG)
+    guilds.set(message.guildId, guild)
+  }
+
+  const channel = await guild.getChannel(message.channelId)
+
+  if (channel == null) {
+    await message.reply(
+      'This channel is not configured for chatting with me.  ' +
+      'Someone with permissions needs to run `/config` to configure this channel.')
     return
   }
 
-  if (
-    CHANNEL_IDS.length > 0 &&
-    !CHANNEL_IDS.includes(message.channelId.toString())
-  ) {
-    console.log('Channel not in list, ignoring')
-    return
-  }
-
-  // ignore our own messages
-  if (message.author.id === client.user.id) {
-    console.log('Ignoring our own message')
-    return
-  }
-
-  if (messages.getMessages(message.channelId) == null) {
-    console.log(
-      'Channel messages is null, ignoring message: ' + message.content
-    )
-    return
-  }
-
-  messages.addMessage(message.channelId, {
+  channel.addMessage({
     role: ChatCompletionRequestMessageRoleEnum.User,
     content: message.content,
-    name: removeNonAlphanumeric(message.author.username)
+    name: message.author.id.toString()
   })
+  await guild.save()
 
   // also ignore @everyone or role mentions
   if (
     (message.mentions.everyone || message.mentions.roles.size > 0) &&
-    IGNORE_EVERYONE
+    channel.config.IGNORE_EVERYONE_MENTIONS
   ) {
     console.log('Ignoring @everyone or role mention')
     return
   }
 
   // also ignore all bots.. we don't want to get into a loop
-  if (message.author.bot && IGNORE_BOTS) {
+  if (message.author.bot && channel.config.IGNORE_BOTS) {
     console.log('Ignoring bot message')
     return
   }
 
-  const existingMessages = messages.getMessages(message.channelId)
-  console.log('Existing messages: ' + existingMessages.length.toString())
+  console.log('Existing messages: ' + channel.messages.length.toString())
 
-  if (!message.mentions.has(client.user) && ONLY_RESPOND_TO_MENTIONS) {
+  if (
+    !message.mentions.has(client.user) &&
+    channel.config.ONLY_RESPOND_TO_MENTIONS
+  ) {
     console.log('Message does not mention bot, ignoring')
     return
   }
@@ -314,7 +348,6 @@ client.on(Events.MessageCreate, async (message) => {
     return
   }
 
-  // set typing
   await message.channel.sendTyping()
   // continulously send typing while waiting for the completion
   const typingInterval = setInterval(() => {
@@ -331,79 +364,84 @@ client.on(Events.MessageCreate, async (message) => {
   try {
     console.log('Checking moderation...')
 
-    const currentMessages = messages.getMessages(message.channelId)
-
-    console.log(currentMessages?.map((message) => message.content) ?? [])
-
     // ensure the message is appropriate
-    const inappropriate = await openAiHelper.areMessagesInappropriate(
-      currentMessages.map((message) => message.content)
+    const badIndices = await openAiHelper.findModerationIndices(
+      channel.messages.map((message) => message.content)
     )
 
-    if (inappropriate) {
-      console.log('Message flagged: ' + message.content)
-      messages.clearMessages(message.channelId)
+    if (badIndices.length > 0) {
+      // remove any messages that were flagged
+      badIndices
+        .sort((a, b) => b - a)
+        .forEach((index) => {
+          channel.messages.splice(index, 1)
+        })
+      await guild.save()
       clearInterval(typingInterval)
-      await message.reply(MODERATION_VIOLATION)
+      await message.reply(channel.config.MODERATION_VIOLATION)
       return
     }
 
     console.log('Generating completion... messages in history')
 
-    // if our messages are too long, remove oldest ones until we're
-    // under the MAX_TOKENS_IN_MESSAGES
-    // ignore System messages in this calculation
-    let totalTokens = countTokens(messages.getMessages(message.channelId))
-    while (
-      totalTokens > getMaxTokens(LANGUAGE_MODEL as Model, TOTAL_MAX_TOKENS)
-    ) {
-      console.log('Removing oldest message to make room for new message: ')
-      messages.removeOldestNonSystemMessage(message.channelId)
-      totalTokens = countTokens(messages.getMessages(message.channelId))
-      console.log(`Total tokens: ${totalTokens}`)
+    // subtract from the guild's token count
+    if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
+      try {
+        await guild.subtractGpt4Tokens(countTokens(channel.messages))
+      } catch (error) {
+        console.error(error)
+        await message.reply('Sorry, you have run out of GPT-4 tokens')
+        clearInterval(typingInterval)
+        return
+      }
+    } else {
+      try {
+        await guild.subtractGpt3Tokens(countTokens(channel.messages))
+      } catch (error) {
+        console.error(error)
+        await message.reply('Sorry, you have run out of GPT-3 tokens')
+        clearInterval(typingInterval)
+        return
+      }
     }
 
-    console.log(
-      `Generating completion using ${totalTokens} tokens from history`
-    )
-
     let response = await openAiHelper.createChatCompletion(
-      messages.getMessages(message.channelId) ?? [],
-      message.author.id,
-      TOTAL_MAX_TOKENS
+      channel.messages ?? [],
+      channel.config.LANGUAGE_MODEL,
+      message.author.id
     )
 
     // let's ensure our own response doesn't violate any moderation
     // rules
-    if (await openAiHelper.areMessagesInappropriate([response])) {
+    if ((await openAiHelper.findModerationIndices([response])).length > 0) {
       console.log('Response flagged: ' + response)
-      messages.clearMessages(message.channelId)
       clearInterval(typingInterval)
-      await message.reply(MODERATION_VIOLATION)
+      await message.reply(channel.config.MODERATION_VIOLATION)
       return
     }
 
-    messages.addMessage(message.channelId, {
+    channel.addMessage({
       role: ChatCompletionRequestMessageRoleEnum.Assistant,
       content: response,
-      name: removeNonAlphanumeric(client.user.username)
+      name: client.user.id.toString()
     })
 
-    // if this is the first assistant message, send the disclaimer first
-    if (
-      currentMessages.filter(
-        (x) => x.role === ChatCompletionRequestMessageRoleEnum.Assistant
-      ).length === 0 &&
-      DISCLAIMER.length > 0
-    ) {
-      response = DISCLAIMER + '\n\n' + response
-    }
+    await guild.save()
 
     console.log('Response: ' + response)
+
+    // if this is the first assistant message, send the disclaimer first
+    if (!channel.disclaimerSent && channel.config.DISCLAIMER.length > 0) {
+      channel.setDisclaimerSent(true)
+      response = channel.config.DISCLAIMER + '\n\n' + response
+      console.log('Adding disclaimer')
+    }
+
     // if the message is too long, split it up into max of 2000
     // characters per message
     // split up the messsage into each 2000 character chunks
     const chunks = response.match(/[\s\S]{1,2000}/g)
+    clearInterval(typingInterval)
     for (const chunk of chunks ?? []) {
       // if it was a mention, reply to the message
       if (message.mentions.has(client.user)) {
@@ -416,7 +454,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
   } catch (e) {
     console.log(e)
-    await message.reply(ERROR_RESPONSE)
+    await message.reply(channel.config.ERROR_RESPONSE)
   } finally {
     clearInterval(typingInterval)
   }
@@ -432,18 +470,14 @@ client
   .login(DISCORD_TOKEN)
   .then(async () => {
     console.log('Logged in!')
-    // set the name and image (if defined)
-    // and if the name is not the same as the current name, change it
-    if (BOT_NAME.length > 0 && BOT_NAME !== client.user?.username) {
-      console.log('Setting bot name to: ' + BOT_NAME)
-      await client.user?.edit({ username: BOT_NAME })
-    }
-
-    // do the same for the bot image
-    if (BOT_IMAGE_URL.length > 0 && BOT_IMAGE_URL !== client.user?.avatar) {
-      console.log('Setting bot image to: ' + BOT_IMAGE_URL)
-      await client.user?.setAvatar(BOT_IMAGE_URL)
-    }
+    // print how many servers we're in
+    console.log(
+      `Connected to ${client.guilds.cache.size} ` +
+      `server(s) with ${client.guilds.cache.reduce(
+        (a, g) => a + g.memberCount,
+        0
+      )} user(s)`
+    )
   })
   .catch((e) => {
     console.error(e)

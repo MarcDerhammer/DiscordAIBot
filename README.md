@@ -7,11 +7,8 @@ This repository contains a Discord bot that leverages OpenAI's powerful language
 ## Features
 
 - Utilizes OpenAI's API for natural language generation
-- Customizable bot name and image
 - Option to reply to all messages or just mentions
-- Option to limit bot to specific channels
-- Error handling and moderation violation responses
-- Commands to set and re-set system messages on the fly
+- Commands to set and re-set system messages on the fly to guide the bot to act a certain way
 
 # Instructions
 
@@ -116,21 +113,6 @@ This might be better if you plan on tweaking any of the environment variables re
 ```env
 OPENAI_API_KEY=your_openai_api_key
 DISCORD_TOKEN=your_discord_token
-
-# the below are optional
-
-# LANGUAGE_MODEL=gpt-3.5-turbo
-# ERROR_RESPONSE=
-# SYSTEM_MESSAGE=
-# MODERATION_VIOLATION_RESPONSE=
-# BOT_NAME=
-# BOT_IMAGE_URL=
-# ONLY_RESPOND_TO_MENTIONS=
-# ONLY_RESPOND_IN_CHANNEL=
-# IGNORE_BOTS=
-# IGNORE_EVERYONE=
-# DISCLAIMER=
-# MAX_TOKENS_PER_MESSAGE=
 ```
 4. Run the Docker container with your `.env` file:
 ```shell
@@ -149,44 +131,65 @@ If you don't wanna use Docker, you can just run the code directly
 ```env
 OPENAI_API_KEY=your_openai_api_key
 DISCORD_TOKEN=your_discord_token
-
-# the below are optional
-# LANGUAGE_MODEL=gpt-3.5-turbo
-# ERROR_RESPONSE=
-# SYSTEM_MESSAGE=
-# MODERATION_VIOLATION_RESPONSE=
-# BOT_NAME=
-# BOT_IMAGE_URL=
-# ONLY_RESPOND_TO_MENTIONS=
-# ONLY_RESPOND_IN_CHANNEL=
-# IGNORE_BOTS=
-# IGNORE_EVERYONE=
-# DISCLAIMER=
-# MAX_TOKENS_PER_MESSAGE=
-
 ```
 4. Run the bot with `yarn start` or `npm start`
 
 --- 
 # Discord Bot Commands
 
-This Discord bot has two primary commands. These commands are `/reset` and `/system`.
+Below is a list of the available bot commands with their respective descriptions:
 
-By default, the following roles will have permission to use these commands: `Administrator`, `ManageMessages`, `ManageChannels`, `ManagerGuild`, `ModerateMembers` but of course you can override these permissions in your server settings.
+### `/reset`
 
-## /reset
+**Description:** Reset the chat for this channel.
 
-The `/reset` command allows users to clear messages from the bot's memory based on the message type. Users can choose to reset ALL, user, system, or "bot" messages. A button will appear in the chat window that allows users to reset the messages. Use this if things are getting too wacky or you want to start over.  Note, if you set any `SYSTEM_MESSAGE` environment variables, it will be retained.  The command will only reset any messages that were set by the `/system` command.
+**Options:**
 
-## /system
+- `reset_type` (required): What to reset.
+  - `All - Clear ALL messages (User, System, and Bot)`
+  - `User - Clear only User messages`
+  - `Bot - Clear only Bot messages`
+  - `System - Clear only System messages`
 
-The `/system` command will allow you to set the `system` message for the bot.  This can guide the bot to act a certain way.  For example:
+### `/config`
+
+**Description:** Configure the chat for this channel.
+
+**Options:**
+
+- `only_mentions` (required): Only respond to mentions (default: true).
+- `ignore_bots` (required): Ignore messages from bots (default: true).
+- `ignore_everyone_mentions` (required): Ignore @everyone and @here (default: true).
+- `language_model` (required): Which language model to use (default: GPT-3.5 Turbo).
+  - `GPT-3.5 Turbo`
+  - `GPT-4`
+
+*Note: The `/config` command is only available for users with Administrator or Manage Guild permissions.*
+
+### `/tokens`
+
+**Description:** Check how many tokens are available.
+
+*Note: The `/tokens` command is only available for users with Administrator or Manage Guild permissions.*
+
+### `/system`
+
+**Description:** Add a system message to this channel. `system` messages can guide the bot to act a certain way.  For example:
 - You only speak spanish
 - You are a pirate
 - You are a time traveller from the year 2552
 - You are some character from a popular show or movie
 - You only speak in pig latin
 - You overuse emojis 😀
+
+**Subcommands:**
+
+- `add`: Add a system message. Example:
+  - `message` (required): The message to add.
+- `list`: List all system messages.
+
+*Note: The `/system` command is only available for users with Administrator or Manage Guild permissions.*
+
 --- 
 
 ## Configuration
@@ -198,23 +201,11 @@ These are the list of environment variables you can set to configure the bot.
 - `OPENAI_API_KEY`: Your API key for OpenAI, used to authenticate with the OpenAI API. [More info](https://openai.com/blog/openai-api)
 - `DISCORD_TOKEN`: Your Discord Bot token, required for the bot to work with Discord
 
-### Optional
-- `SYSTEM_MESSAGE`: The initial prompt to use with the bot, sent as a "system" message. Example: `You are the Master Chief from Halo. Stay in character as much as possible` You can also set or clear system messages with the `/system` and `/reset` command (see above)
-- `ERROR_RESPONSE`: The message the bot will send when there's an error in processing the user's input. These appear when there's some sort of error. See the logs for information. Default: `Sorry, there was an error. Please try again later.`
-- `MODERATION_VIOLATION_RESPONSE`: The message the bot will send when a user's input violates OpenAI's moderation policy. It should probably also mention that the chat history will stop being processed before this point.  Default: `Some content was detected violating Open AI's usage policies. Chat history has been cleared from future responses.`
-- `LANGUAGE_MODEL`: The OpenAI language model you wish to use.  Defaults to `gpt-3.5-turbo`.
-- `BOT_NAME`: A custom name for your bot. You can also set this in the [Discord Developer Portal](https://discord.com/developers/applications)
-- `BOT_IMAGE_URL`: A URL for a custom image to represent your bot. Also can be set in the [Discord Developer Portal](https://discord.com/developers/applications)
-- `ONLY_RESPOND_TO_MENTIONS`: Set this to `false` if you want the bot to respond to every message in a channel (default: `true`).  This can become expensive/chaotic so be careful. This will also behave differently depending if bot was mentioned.  If the bot is mentioned, it will "reply", but if this config is set to `false` and it sees a message, it will just send a message to the channel normally.  If it sees a message that has mentions and the bot is not mentioned, it will not respond.
-- `ONLY_RESPOND_IN_CHANNEL`: A comma-separated list of channel IDs if you want the bot to work only in specific channels. By default, it will operate in all channels it has access to.  To find a channel ID, enable "developer mode" in Discord and right click a text channel.
-- `IGNORE_BOTS`: Set this to `false` if you want the bot to respond to other bots (default: `true`) (This can become expensive/chaotic so be careful)
-- `IGNORE_EVERYONE`: Set this to `false` if you want the bot to respond to messages that mention `@everyone` or `@here` (default: `true`)
-- `DISCLAIMER`: This message will be sent immediatly before the first chat response is sent. [OpenAI Policy](https://openai.com/policies/usage-policies) requires chatbots to disclose that users are interacting with an AI system.  Read the [OpenAI Policy](https://openai.com/policies/usage-policies) for more information on how to comply with their policies.
-- `MAX_TOKENS_PER_MESSAGE`: Set a limit for the number of tokens used per chat completion. If you set this number too small the bot won't "remember" many past messages, but if you set it too high, your bill will be higher.  By default it's the max of the model. [See here for more info](https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them)
-
 ## Memory and Token Limit
 
 The OpenAI language models, such as `gpt-3.5-turbo`, have a token limit that affects the amount of text they can process in a single API call. The token limit for `gpt-3.5-turbo` is 4096 tokens. Each token can represent a single character or a few characters, such as a word or a punctuation mark.
+
+`gpt-4` has a larger limit of 8192 tokens.
 
 Due to this token limit, the bot will only remember the most recent messages up to the model's token limit. If the conversation history exceeds this limit, the bot may not be able to remember or respond to older messages appropriately. Keep in mind that very long conversations might also result in incomplete or truncated responses from the bot.
 
