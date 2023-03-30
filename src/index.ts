@@ -7,8 +7,7 @@ import {
 
 import {
   Client, type CommandInteraction,
-  Events, GatewayIntentBits,
-  type TextChannel
+  Events, GatewayIntentBits, TextChannel
 } from 'discord.js'
 import { getEnv } from './env'
 
@@ -18,8 +17,9 @@ import { DEFAULT_GUILD_CONFIG, Guild, GUILD_DIRECTORY } from './messages/Guild'
 import { type ChannelConfig } from './messages/ChannelConfig'
 import { Channel } from './messages/Channel'
 import RegisterCommands from './commands/RegisterCommands'
-import generateCheckout, { handleWebHook } from './stripe/Checkout'
+import generateCheckout, { handleWebHook, stripe, WEBHOOK_SECRET } from './stripe/Checkout'
 import express from 'express'
+import bodyParser from 'body-parser'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
@@ -43,25 +43,47 @@ const client = new Client({
 const guilds = new Map<string, Guild>()
 
 const app = express()
+// get post body too
 const port = 3005
-app.post('/stripe', async (req, res) => {
-  const result = await handleWebHook(req, guilds)
-  
+app.get('/ping', (req, res) => {
+  res.send('pong')
+})
+
+// Use JSON parser for all non-webhook routes
+app.use((req, res, next) => {
+  if (req.originalUrl === '/stripe') {
+    next()
+  } else {
+    bodyParser.json()(req, res, next)
+  }
+})
+
+// use raw payload for stripe
+app.post('/stripe', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
+  const result = await handleWebHook(req, res, guilds)
+  if (!result.success) {
+    res.status(500).send('Error')
+    return
+  }
+
+  if (result.channelId === undefined || result.tokens === undefined) {
+    res.status(500).send('Error')
+    return
+  }
+
+  // get the channel and send a message
+  const channel = await client.channels.fetch(result.channelId)
+  if (channel instanceof TextChannel) {
+    if ((result.anonymous ?? false) || result.userId == null || result.userId.length === 0) {
+      await channel.send('An anonymous user purchased ' +
+        result.tokens.toLocaleString() + ' tokens for ' + result.type)
+    } else {
+      await channel.send(`<@${result.userId}> purchased ` +
+      `${result.tokens.toLocaleString()} tokens for ${result.type}!`)
+    }
+  }
   res.send('Success')
   return result
-  // const result = await handleWebHook(req, guilds)
-
-  // if (!result.success) {
-  //   res.status(500).send('Error')
-  //   // return
-  // }
-
-  // // get the channel and send a message
-  // const channel = await client.channels.fetch(result.channelId)
-  // if (channel instanceof TextChannel) {
-  //   await channel.send('Thank you for your purchase!')
-  // }
-  // res.send('Success')
 })
 
 client.once(Events.ClientReady, async () => {

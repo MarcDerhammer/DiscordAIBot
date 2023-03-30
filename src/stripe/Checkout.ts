@@ -2,35 +2,53 @@ import Stripe from 'stripe'
 import { type Guild } from '../messages/Guild'
 import { type Request, type Response } from 'express'
 
-if (process.env.STRIPE_SECRET_KEY?.length === 0 || process.env.STRIPE_SECRET_KEY === undefined) {
+if (
+  process.env.STRIPE_SECRET_KEY?.length === 0 ||
+  process.env.STRIPE_SECRET_KEY === undefined
+) {
   throw new Error('Please set the STRIPE_SECRET_KEY environment variable.')
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2022-11-15'
 })
 
-const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
+export const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
 
 export interface WebhookResponse {
   success: boolean
   anonymous?: boolean
   userId?: string
   channelId?: string
+  type?: 'GPT-3' | 'GPT-4'
+  tokens?: number
 }
 
 export async function handleWebHook (
-  req: Request, guilds: Map<string, Guild>):
-  Promise<WebhookResponse> {
+  req: Request,
+  res: Response,
+  guilds: Map<string, Guild>
+): Promise<WebhookResponse> {
   try {
     if (WEBHOOK_SECRET === undefined || WEBHOOK_SECRET.length === 0) {
-      throw new Error('Please set the STRIPE_WEBHOOK_SECRET environment variable.')
+      throw new Error(
+        'Please set the STRIPE_WEBHOOK_SECRET environment variable.'
+      )
     }
     const sig = req.headers['stripe-signature'] as string
 
     const event = stripe.webhooks.constructEvent(req.body, sig, WEBHOOK_SECRET)
+
     if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session
+      const simpleSession = event.data.object as Stripe.Checkout.Session
+
+      // expand session to get more info
+      const session = await stripe.checkout.sessions.retrieve(
+        simpleSession.id,
+        {
+          expand: ['payment_intent', 'line_items']
+        }
+      )
 
       if (session.metadata === undefined) {
         throw new Error('Metadata not found')
@@ -46,7 +64,10 @@ export async function handleWebHook (
       const userId = session.metadata?.purchaser_id as string
 
       // get amount
-      const quantity = session.line_items?.data[0].quantity as number
+      let quantity = session.line_items?.data[0].quantity as number | undefined
+      if (quantity === undefined) {
+        quantity = 0
+      }
       const type = session.line_items?.data[0].description as string
 
       const channelId = session.metadata?.channel_id as string
@@ -73,7 +94,9 @@ export async function handleWebHook (
         success: true,
         anonymous: anonymousValue,
         userId,
-        channelId
+        channelId,
+        type: type.includes('GPT-3') ? 'GPT-3' : 'GPT-4',
+        tokens: totalToAdd
       }
     }
   } catch (err) {
@@ -93,17 +116,17 @@ export default async function generateCheckout (
   const session = await stripe.checkout.sessions.create({
     custom_text: {
       submit: {
-        message: 'Tokens are used to generate messages.  Using OpenAI\'s GPT-3.5-Turbo model, ' +
-        'one message using a full "memory" is 4,096 tokens.  So 1 Million tokens will ' +
-        'generate around 250 messages. \n' +
-         'Please note that this balance will be added to ' +
-        'the entire server\'s balance.'
+        message:
+          "Tokens are used to generate messages.  Using OpenAI's GPT-3.5-Turbo model, " +
+          'one message using a full "memory" is 4,096 tokens.  So 1 Million tokens will ' +
+          'generate around 250 messages. \n' +
+          'Please note that this balance will be added to ' +
+          "the entire server's balance." +
+          'Your email is not shared with the server but if you selected "No" for anonymous, ' +
+          'your Discord username will be mentioned in the server.'
       }
     },
-    payment_method_types: [
-      'card',
-      'cashapp'
-    ],
+    payment_method_types: ['card', 'cashapp'],
     success_url: 'https://google.com/',
     cancel_url: 'https://bing.com',
     line_items: [
@@ -118,7 +141,8 @@ export default async function generateCheckout (
           currency: 'usd',
           product_data: {
             name: '1 Million GPT-3 Tokens',
-            description: 'GPT-3 Tokens for Discord Server: "' + serverName + '"'
+            description:
+              'GPT-3 Tokens for Discord Server: "' + serverName + '"'
           },
           unit_amount: 300
         }
@@ -132,7 +156,7 @@ export default async function generateCheckout (
         type: 'dropdown',
         optional: false,
         label: {
-          custom: 'Purchase anonymously',
+          custom: 'Purchase anonymously (mention you in server)',
           type: 'custom'
         },
         dropdown: {

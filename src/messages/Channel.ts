@@ -5,6 +5,8 @@ import {
 import { countTokens } from '../OpenAiHelper'
 import { type ChannelConfig } from './ChannelConfig'
 
+const EXTRA_TOKENS_BUFFER = 500
+
 export class Channel {
   id: string
   messages: ChatCompletionRequestMessage[]
@@ -30,7 +32,7 @@ export class Channel {
   addMessage (message: ChatCompletionRequestMessage): void {
     this.messages.push(message)
 
-    while (countTokens(this.messages) > this.config.MAX_TOKENS_PER_MESSAGE) {
+    while (countTokens(this.messages) + EXTRA_TOKENS_BUFFER > this.config.MAX_TOKENS_PER_MESSAGE) {
       console.log('Removing message to avoid exceeding max token count')
       // remove the first non-system message
       const index = this.messages.findIndex(
