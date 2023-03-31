@@ -85,7 +85,7 @@ export class Channel {
           id: this.id,
           guildId: this.guildId,
           config: this.config,
-          disclaimerSend: this.disclaimerSent
+          disclaimerSent: this.disclaimerSent
         }
       },
       { upsert: true }

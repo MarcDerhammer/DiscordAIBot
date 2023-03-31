@@ -565,6 +565,7 @@ client.on(Events.MessageCreate, async (message) => {
       channel.setDisclaimerSent(true)
       response = channel.config.DISCLAIMER + '\n\n' + response
       console.log('Adding disclaimer')
+      await channel.save()
     }
 
     // if the message is too long, split it up into max of 2000
