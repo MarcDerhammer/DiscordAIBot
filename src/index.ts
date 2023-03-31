@@ -17,7 +17,7 @@ import { DEFAULT_GUILD_CONFIG, Guild, GUILD_DIRECTORY } from './messages/Guild'
 import { type ChannelConfig } from './messages/ChannelConfig'
 import { Channel } from './messages/Channel'
 import RegisterCommands from './commands/RegisterCommands'
-import generateCheckout, { handleWebHook, stripe, WEBHOOK_SECRET } from './stripe/Checkout'
+import generateCheckout, { handleWebHook } from './stripe/Checkout'
 import express from 'express'
 import bodyParser from 'body-parser'
 

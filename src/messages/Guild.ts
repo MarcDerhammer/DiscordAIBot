@@ -3,6 +3,7 @@ import { Channel } from './Channel'
 import { type ChannelConfig } from './ChannelConfig'
 import fs from 'fs'
 import { DEFAULT_MODERATION_VIOATION_RESPONSE, DISCLAIMER } from '../env'
+import { mongoClient } from '../mongo/MongoClient'
 
 export const DEFAULT_GUILD_CONFIG: ChannelConfig = {
   MAX_TOKENS_PER_MESSAGE: Number.MAX_SAFE_INTEGER,
@@ -82,36 +83,50 @@ export class Guild {
   }
 
   async save (): Promise<void> {
-    await new Promise((resolve, reject) => {
-      if (!fs.existsSync(GUILD_DIRECTORY)) {
-        fs.mkdirSync(GUILD_DIRECTORY)
-      }
-      // write files to a folder called 'channels'
-      fs.writeFile(
-        `${GUILD_DIRECTORY}/${this.id}.json`,
-        this.toJson(),
-        (err) => {
-          if (err != null) {
-            reject(err)
-          } else {
-            resolve(true)
-          }
+    const guildsCollection = mongoClient.db('discord').collection('guilds')
+    await guildsCollection.updateOne(
+      { id: this.id },
+      {
+        $set: {
+          gpt3TokensAvailable: this.gpt3TokensAvailable,
+          gpt4TokensAvailable: this.gpt4TokensAvailable,
+          defaultConfig: this.defaultConfig
         }
-      )
-    })
+      },
+      { upsert: true }
+    )
+
+    //   if (!fs.existsSync(GUILD_DIRECTORY)) {
+    //     fs.mkdirSync(GUILD_DIRECTORY)
+    //   }
+    //   // write files to a folder called 'channels'
+    //   fs.writeFile(
+    //     `${GUILD_DIRECTORY}/${this.id}.json`,
+    //     this.toJson(),
+    //     (err) => {
+    //       if (err != null) {
+    //         reject(err)
+    //       } else {
+    //         resolve(true)
+    //       }
+    //     }
+    //   )
   }
 
   static async load (json: string): Promise<Guild> {
     try {
-      const jsonObj = JSON.parse(json)
+        // query the 
 
-      const guild = new Guild(jsonObj.id, jsonObj.defaultConfig)
-      guild.gpt3TokensAvailable = jsonObj.gpt3TokensAvailable
-      guild.gpt4TokensAvailable = jsonObj.gpt4TokensAvailable
-      jsonObj.channels.forEach((channelJson: string) => {
-        const channel = Channel.load(channelJson)
-        guild.channels.set(channel.id, channel)
-      })
+
+    //   const jsonObj = JSON.parse(json)
+
+    //   const guild = new Guild(jsonObj.id, jsonObj.defaultConfig)
+    //   guild.gpt3TokensAvailable = jsonObj.gpt3TokensAvailable
+    //   guild.gpt4TokensAvailable = jsonObj.gpt4TokensAvailable
+    //   jsonObj.channels.forEach((channelJson: string) => {
+    //     const channel = Channel.load(channelJson)
+    //     guild.channels.set(channel.id, channel)
+    //   })
       return guild
     } catch (e) {
       throw new Error('Failed to load guild: ' + e.message)
