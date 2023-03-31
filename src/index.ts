@@ -11,15 +11,16 @@ import {
 } from 'discord.js'
 import { getEnv } from './env'
 
-import { countTokens, OpenAiHelper } from './OpenAiHelper'
-import fs from 'fs'
-import { DEFAULT_GUILD_CONFIG, Guild, GUILD_DIRECTORY } from './messages/Guild'
+import { OpenAiHelper } from './OpenAiHelper'
+import { DEFAULT_GUILD_CONFIG, Guild } from './messages/Guild'
 import { type ChannelConfig } from './messages/ChannelConfig'
 import { Channel } from './messages/Channel'
 import RegisterCommands from './commands/RegisterCommands'
 import generateCheckout, { handleWebHook } from './stripe/Checkout'
 import express from 'express'
 import bodyParser from 'body-parser'
+import { Message } from './messages/Message'
+import { mongoClient } from './mongo/MongoClient'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
@@ -40,7 +41,61 @@ const client = new Client({
 })
 
 // const channels = new Map<string, Channel>()
-const guilds = new Map<string, Guild>()
+const guilds = new Map<string, Guild>();
+
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
+(async () => {
+  // load up all the guilds and messages
+  const guildsCollection = mongoClient.db('discord').collection('guilds')
+  const guildsCursor = await guildsCollection.find()
+  const guildsDocs = await guildsCursor.toArray()
+  for (const guildDoc of guildsDocs) {
+    const guild = new Guild(guildDoc.id, guildDoc.config)
+    guilds.set(guild.id, guild)
+    // now look up all the channels for this guild
+    const channelsCollection = mongoClient.db('discord').collection('channels')
+
+    // query where guildId = guild.id
+    const channelsCursor = await channelsCollection.find({ guildId: guild.id })
+    const channelsDocs = await channelsCursor.toArray()
+
+    // Process the channels as needed
+    for (const channelDoc of channelsDocs) {
+      console.log('Channel:', channelDoc)
+      // Perform operations with the channelDoc
+      const channel = new Channel(
+        channelDoc.id,
+        guild.id,
+        channelDoc.config,
+        channelDoc.disclaimerSent
+      )
+      guild.channels.set(channelDoc.id, channel)
+
+      // Get all messages for the current channel
+      const messagesCollection = mongoClient.db('discord').collection('messages')
+
+      // query where channelId = channelDoc.id
+      const messagesCursor = await messagesCollection.find({ channelId: channelDoc.id })
+      const messagesDocs = await messagesCursor.toArray()
+
+      // Process the messages as needed
+      for (const messageDoc of messagesDocs) {
+        console.log('Message:', messageDoc)
+        const message = new Message({
+          id: messageDoc.id,
+          guildId: messageDoc.guildId,
+          channelId: messageDoc.channelId,
+          userId: messageDoc.userId,
+          content: messageDoc.content,
+          timestamp: messageDoc.timestamp,
+          type: messageDoc.type,
+          chatCompletionRequestMessage: messageDoc.chatCompletionRequestMessage
+        })
+        channel.messages.push(message)
+      }
+    }
+  }
+})()
 
 const app = express()
 // get post body too
@@ -59,6 +114,7 @@ app.use((req, res, next) => {
 })
 
 // use raw payload for stripe
+// eslint-disable-next-line @typescript-eslint/no-misused-promises
 app.post('/stripe', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
   const result = await handleWebHook(req, res, guilds)
   if (!result.success) {
@@ -76,14 +132,13 @@ app.post('/stripe', bodyParser.raw({ type: 'application/json' }), async (req, re
   if (channel instanceof TextChannel) {
     if ((result.anonymous ?? false) || result.userId == null || result.userId.length === 0) {
       await channel.send('An anonymous user purchased ' +
-        result.tokens.toLocaleString() + ' tokens for ' + result.type)
+        `${result.tokens.toLocaleString()} tokens for ${result.type ?? ''}`)
     } else {
       await channel.send(`<@${result.userId}> purchased ` +
-      `${result.tokens.toLocaleString()} tokens for ${result.type}!`)
+      `${result.tokens.toLocaleString()} tokens for ${result.type ?? ''}!`)
     }
   }
   res.send('Success')
-  return result
 })
 
 client.once(Events.ClientReady, async () => {
@@ -91,20 +146,6 @@ client.once(Events.ClientReady, async () => {
 
   // register commands
   await RegisterCommands(client)
-
-  if (!fs.existsSync(GUILD_DIRECTORY)) {
-    fs.mkdirSync(GUILD_DIRECTORY)
-  }
-
-  // iterate over all files in the channels directory and load them
-  const files = fs.readdirSync(GUILD_DIRECTORY)
-  for (const file of files) {
-    const filePath = `${GUILD_DIRECTORY}/${file}`
-    const fileContent = fs.readFileSync(filePath, 'utf-8')
-
-    const guild = await Guild.load(fileContent)
-    guilds.set(guild.id, guild)
-  }
 })
 
 // // register commands to the their handlers
@@ -155,16 +196,19 @@ commands.set('config', async (interaction) => {
       ...DEFAULT_GUILD_CONFIG,
       ...configPartial
     }
-    channel = new Channel(interaction.channelId, channelConfig)
+    channel = new Channel(
+      interaction.channelId,
+      interaction.guildId,
+      channelConfig
+    )
     guild.channels.set(interaction.channelId, channel)
-    await guild.save()
   } else {
     channel.config = {
       ...channel.config,
       ...configPartial
     }
-    await guild.save()
   }
+  await channel.save()
   await interaction.reply({
     content: 'Channel configured with the following settings: \n' +
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -296,7 +340,8 @@ commands.set('system', async (interaction) => {
 
   if (list) {
     const messages =
-      channel.messages.filter((x) => x.role === ChatCompletionResponseMessageRoleEnum.System)
+      channel.messages.filter(
+        (x) => x.chatCompletionRequestMessage.role === ChatCompletionResponseMessageRoleEnum.System)
     const messageList = messages.map((m) => m.content).join('\n')
     await interaction.reply({
       content: `System messages: \n${messageList}`
@@ -315,7 +360,18 @@ commands.set('system', async (interaction) => {
     role: ChatCompletionResponseMessageRoleEnum.System,
     name: client.user?.id
   }
-  channel.addMessage(systemMessage)
+
+  const newMessage = new Message({
+    guildId: interaction.guildId,
+    channelId: interaction.channelId,
+    content: message,
+    timestamp: interaction.createdTimestamp,
+    type: ChatCompletionResponseMessageRoleEnum.System,
+    userId: client.user?.id ?? '',
+    chatCompletionRequestMessage: systemMessage
+  })
+
+  await channel.addMessage(newMessage)
   await interaction.reply({
     content: `System message added by <@${interaction.user.id}>: \n${message}`
   })
@@ -353,6 +409,7 @@ client.on(Events.MessageCreate, async (message) => {
     console.log('Guild not found, creating new one')
     guild = new Guild(message.guildId, DEFAULT_GUILD_CONFIG)
     guilds.set(message.guildId, guild)
+    await guild.save()
   }
 
   const channel = await guild.getChannel(message.channelId)
@@ -366,12 +423,22 @@ client.on(Events.MessageCreate, async (message) => {
     return
   }
 
-  channel.addMessage({
-    role: ChatCompletionRequestMessageRoleEnum.User,
+  const newMessage = new Message({
+    id: message.id,
+    guildId: message.guildId,
+    channelId: message.channelId,
+    userId: message.author.id,
+    timestamp: message.createdTimestamp,
+    type: ChatCompletionRequestMessageRoleEnum.User,
     content: message.content,
-    name: message.author.id.toString()
+    chatCompletionRequestMessage: {
+      role: ChatCompletionRequestMessageRoleEnum.User,
+      content: message.content,
+      name: message.author.id.toString()
+    }
   })
-  await guild.save()
+
+  await channel.addMessage(newMessage)
 
   // also ignore @everyone or role mentions
   if (
@@ -432,7 +499,6 @@ client.on(Events.MessageCreate, async (message) => {
         .forEach((index) => {
           channel.messages.splice(index, 1)
         })
-      await guild.save()
       clearInterval(typingInterval)
       await message.reply(channel.config.MODERATION_VIOLATION)
       return
@@ -443,7 +509,7 @@ client.on(Events.MessageCreate, async (message) => {
     // subtract from the guild's token count
     if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
       try {
-        await guild.subtractGpt4Tokens(countTokens(channel.messages))
+        await guild.subtractGpt4Tokens(channel.countTotalTokens())
       } catch (error) {
         console.error(error)
         await message.reply('Sorry, you have run out of GPT-4 tokens')
@@ -452,7 +518,7 @@ client.on(Events.MessageCreate, async (message) => {
       }
     } else {
       try {
-        await guild.subtractGpt3Tokens(countTokens(channel.messages))
+        await guild.subtractGpt3Tokens(channel.countTotalTokens())
       } catch (error) {
         console.error(error)
         await message.reply('Sorry, you have run out of GPT-3 tokens')
@@ -462,7 +528,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     let response = await openAiHelper.createChatCompletion(
-      channel.messages ?? [],
+      channel.messages.map((message) => message.chatCompletionRequestMessage),
       channel.config.LANGUAGE_MODEL,
       message.author.id
     )
@@ -476,13 +542,21 @@ client.on(Events.MessageCreate, async (message) => {
       return
     }
 
-    channel.addMessage({
-      role: ChatCompletionRequestMessageRoleEnum.Assistant,
+    const newMessage = new Message({
+      guildId: message.guildId,
+      channelId: message.channelId,
+      userId: client.user.id,
+      timestamp: Date.now(),
+      type: ChatCompletionRequestMessageRoleEnum.Assistant,
       content: response,
-      name: client.user.id.toString()
+      chatCompletionRequestMessage: {
+        role: ChatCompletionRequestMessageRoleEnum.Assistant,
+        content: response,
+        name: client.user.id.toString()
+      }
     })
 
-    await guild.save()
+    await channel.addMessage(newMessage)
 
     console.log('Response: ' + response)
 

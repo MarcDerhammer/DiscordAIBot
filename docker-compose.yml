@@ -16,15 +16,17 @@ services:
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
     ports:
       - "8000:8000" # Map the host's port 8000 to the container's port 8000
+    links:
+      - mongodb
     networks:
       - isolated_network
 
   mongodb:
     image: mongo:latest
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=root
-      - MONGO_INITDB_ROOT_PASSWORD=example
-      - MONGO_INITDB_DATABASE=discord_bot
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=example=${MONGO_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_DATABASE}
     ports:
       - "27017:27017" # Map the host's port 27017 to the container's port 27017
     networks:
@@ -32,4 +34,3 @@ services:
 
 networks:
   isolated_network:
-    driver: bridge

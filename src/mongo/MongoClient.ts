@@ -1,3 +1,12 @@
 import { MongoClient } from 'mongodb'
 
-export const mongoClient = new MongoClient('mongodb://root:example@localhost:27017/discord_bot')
+// Connection URI
+const user = encodeURIComponent(process.env.MONGO_USER ?? '')
+const password = encodeURIComponent(process.env.MONGO_PASSWORD ?? '')
+const host = process.env.MONGO_HOST ?? ''
+const port = process.env.MONGO_PORT ?? ''
+const dbName = process.env.MONGO_DB ?? ''
+
+const uri = `mongodb://${user}:${password}@${host}:${port}/${dbName}?authSource=admin`
+
+export const mongoClient = new MongoClient(uri)
