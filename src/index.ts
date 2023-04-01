@@ -7,7 +7,7 @@ import {
 
 import {
   Client, type CommandInteraction,
-  Events, GatewayIntentBits
+  Events, GatewayIntentBits, TextChannel
 } from 'discord.js'
 import { getEnv } from './env'
 
@@ -24,6 +24,7 @@ import { mongoClient } from './mongo/MongoClient'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
+const ADMIN_API_KEY = getEnv('ADMIN_API_KEY')
 
 const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
@@ -120,6 +121,78 @@ app.use((req, res, next) => {
 // eslint-disable-next-line @typescript-eslint/no-misused-promises
 app.post('/stripe', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
   await handleWebHook(req, res, guilds, client)
+})
+
+// an admin post that accepts the following body:
+// the api key must be set in a header
+// all are optional:
+// guildId,
+// channelId,
+// message
+// gpt-4-tokens
+// gpt-3-tokens
+// this allows an admin to adjust remaining tokenks for a guild
+// and send a message to the channel explaining
+// eslint-disable-next-line @typescript-eslint/no-misused-promises
+app.post('/admin', async (req, res) => {
+  try {
+    if (ADMIN_API_KEY == null || ADMIN_API_KEY.length === 0) {
+      res.status(401).send('Unauthorized')
+      return
+    }
+    const apiKey = req.headers['api-key']
+
+    if (apiKey === null || apiKey === undefined || apiKey !== ADMIN_API_KEY) {
+      res.status(401).send('Unauthorized')
+      return
+    }
+
+    const guildId = req.body.guildId
+    const channelId = req.body.channelId
+    const message = req.body.message
+    const gpt4Tokens = req.body.gpt4Tokens
+    const gpt3Tokens = req.body.gpt3Tokens
+
+    if (guildId == null) {
+      res.status(400).send('GuildId is required')
+      return
+    }
+
+    const guild = guilds.get(guildId as string)
+    if (guild == null) {
+      res.status(400).send('Guild not found')
+      return
+    }
+
+    if (gpt4Tokens != null) {
+      guild.gpt4TokensAvailable += gpt4Tokens as number
+      console.log(`Added ${gpt4Tokens as string} to ${guildId as string}`)
+      await guild.save()
+    }
+
+    if (gpt3Tokens != null) {
+      guild.gpt3TokensAvailable += gpt3Tokens as number
+      console.log(`Added ${gpt3Tokens as string} to ${guildId as string}`)
+      await guild.save()
+    }
+
+    if (channelId != null) {
+      if (message != null) {
+        console.log('Looking up channel...')
+        const channel = await client.channels.fetch(channelId)
+        const messagePrefix = '`[Message from Developer]`\n'
+        if (channel instanceof TextChannel) {
+          await channel.send(messagePrefix + (message as string))
+        } else {
+          console.log('Channel not found')
+        }
+      }
+    }
+    res.send('ok')
+  } catch (e) {
+    console.log(e)
+    res.status(500).send('Internal Server Error')
+  }
 })
 
 client.once(Events.ClientReady, async () => {

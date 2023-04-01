@@ -20,6 +20,7 @@ interface OptionalEnv {
   GPT3_TOKENS_AVAILABLE_PER_SERVER?: string
   GPT4_TOKENS_AVAILABLE_PER_SERVER?: string
   STRIPE_SECRET_KEY?: string
+  ADMIN_API_KEY?: string
 }
 
 type Env = RequiredEnv & OptionalEnv
@@ -27,7 +28,8 @@ type Env = RequiredEnv & OptionalEnv
 const env: EnvConfig = {
   API_KEY: process.env.OPENAI_API_KEY,
   DISCORD_TOKEN: process.env.DISCORD_TOKEN,
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  ADMIN_API_KEY: process.env.ADMIN_API_KEY
 }
 
 function isRequiredEnv (key: keyof Env): key is keyof RequiredEnv {
