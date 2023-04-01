@@ -7,6 +7,8 @@ import { type ChannelConfig } from './ChannelConfig'
 import { type Message } from './Message'
 
 const EXTRA_TOKENS_BUFFER = 500
+const GPT_4_LIMIT = 8192
+const GPT_3_LIMIT = 4096
 
 export class Channel {
   id: string
@@ -44,7 +46,10 @@ export class Channel {
     this.messages.push(message)
     await message.save()
 
-    while (this.countTotalTokens() > this.config.MAX_TOKENS_PER_MESSAGE + EXTRA_TOKENS_BUFFER) {
+    while (this.countTotalTokens() >
+      (this.config.LANGUAGE_MODEL === 'gpt-3.5-turbo'
+        ? GPT_3_LIMIT
+        : GPT_4_LIMIT) + EXTRA_TOKENS_BUFFER) {
       console.log('Removing message to avoid exceeding max token count')
       // remove the first non-system message
       const index = this.messages.findIndex(
