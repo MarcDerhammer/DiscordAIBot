@@ -579,6 +579,15 @@ client.on(Events.MessageCreate, async (message) => {
       }
     }
 
+    // lastly ensure the guild is at least one week old to prevent abuse
+    if (((message.guild?.createdTimestamp) == null) ||
+      message.guild.createdTimestamp > Date.now() - 1000 * 60 * 60 * 24 * 7) {
+      await message.reply('Sorry. To prevent abuse, your server must be at ' +
+        'least one week old to use this bot')
+      clearInterval(typingInterval)
+      return
+    }
+
     let response = await openAiHelper.createChatCompletion(
       channel.messages.map((message) => message.chatCompletionRequestMessage),
       channel.config.LANGUAGE_MODEL,
