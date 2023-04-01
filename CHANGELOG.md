@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+-   Bots are now always ignored, no config to allow them
+
 ## [3.0.1] - 2023-04-01
 
 ### Fixed

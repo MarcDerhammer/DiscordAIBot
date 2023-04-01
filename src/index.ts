@@ -7,7 +7,7 @@ import {
 
 import {
   Client, type CommandInteraction,
-  Events, GatewayIntentBits, TextChannel
+  Events, GatewayIntentBits
 } from 'discord.js'
 import { getEnv } from './env'
 
