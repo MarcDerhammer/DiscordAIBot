@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.6] - 2023-04-01
+
+### Changed
+
+-   Better logging
+
 ## [3.0.5] - 2023-04-01
 
 ### Added
@@ -50,7 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.5...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.6...HEAD
+
+[3.0.6]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.5...3.0.6
 
 [3.0.5]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.4...3.0.5
 

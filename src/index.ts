@@ -454,7 +454,8 @@ client.on(Events.MessageCreate, async (message) => {
   if (client.user?.id == null || message.channelId == null) return
   if (message.author.id === client.user.id) return
 
-  console.log(message.author.username + ': ' + message.content)
+  console.log(`${message.guildId}:${message.channelId ?? '<>'}:` +
+    `${message.author.username}: ${message.content}`)
 
   let guild = guilds.get(message.guildId)
   if (guild == null) {
@@ -466,9 +467,11 @@ client.on(Events.MessageCreate, async (message) => {
 
   const channel = await guild.getChannel(message.channelId)
 
+  const LOG_PREFIX = `${message.guildId}:${message.channelId}:`
+
   if (channel == null) {
     if (message.mentions.users.has(client.user.id)) {
-      console.error('Channel not found, but mentioned, replying with /config message')
+      console.error(LOG_PREFIX + 'Channel not found, but mentioned, replying with /config message')
       await message.reply(
         'This channel is not configured for chatting with me.  ' +
         'Someone with permissions needs to run `/config` to configure this channel.')
@@ -498,13 +501,13 @@ client.on(Events.MessageCreate, async (message) => {
     (message.mentions.everyone || message.mentions.roles.size > 0) &&
     channel.config.IGNORE_EVERYONE_MENTIONS
   ) {
-    console.log('Ignoring @everyone or role mention')
+    console.log(LOG_PREFIX + 'Ignoring @everyone or role mention')
     return
   }
 
   // also ignore all bots.. we don't want to get into a loop
   if (message.author.bot && channel.config.IGNORE_BOTS) {
-    console.log('Ignoring bot message')
+    console.log(LOG_PREFIX + 'Ignoring bot message')
     return
   }
 
@@ -514,13 +517,13 @@ client.on(Events.MessageCreate, async (message) => {
     !message.mentions.has(client.user) &&
     channel.config.ONLY_RESPOND_TO_MENTIONS
   ) {
-    console.log('Message does not mention bot, ignoring')
+    console.log(LOG_PREFIX + 'Message does not mention bot, ignoring')
     return
   }
 
   // if there were mentions that don't include us, ignore
   if (message.mentions.users.size > 0 && !message.mentions.has(client.user)) {
-    console.log('Message mentions other users, ignoring')
+    console.log(LOG_PREFIX + 'Message mentions other users, ignoring')
     return
   }
 
@@ -530,7 +533,7 @@ client.on(Events.MessageCreate, async (message) => {
     message.channel
       .sendTyping()
       .then(() => {
-        console.log('Sent typing...')
+        console.log(LOG_PREFIX + 'Sent typing...')
       })
       .catch(() => {
         console.error('Error sending typing')
@@ -538,7 +541,7 @@ client.on(Events.MessageCreate, async (message) => {
   }, 5000)
 
   try {
-    console.log('Checking moderation...')
+    console.log(LOG_PREFIX + 'Checking moderation...')
 
     // ensure the message is appropriate
     const badIndices = await openAiHelper.findModerationIndices(
@@ -560,7 +563,7 @@ client.on(Events.MessageCreate, async (message) => {
     // lastly ensure the guild is at least one week old to prevent abuse
     if (((message.guild?.createdTimestamp) == null) ||
         message.guild.createdTimestamp > Date.now() - 1000 * 60 * 60 * 24 * 7) {
-      console.log('Guild is too new, ignoring')
+      console.log(LOG_PREFIX + 'Guild is too new, ignoring')
       await message.reply('Sorry. To prevent abuse, your server must be at ' +
           'least one week old to use this bot')
       clearInterval(typingInterval)
@@ -569,7 +572,7 @@ client.on(Events.MessageCreate, async (message) => {
 
     if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
       if (guild.gpt4TokensAvailable <= 0) {
-        console.log('No tokens available for GPT-4')
+        console.log(LOG_PREFIX + 'No tokens available for GPT-4')
         await message.reply('Sorry, you have run out of GPT-4 tokens. `/tokens` to get more')
         clearInterval(typingInterval)
         guild.gpt4TokensAvailable = 0
@@ -578,7 +581,7 @@ client.on(Events.MessageCreate, async (message) => {
       }
     } else {
       if (guild.gpt3TokensAvailable <= 0) {
-        console.log('No tokens available for GPT-3')
+        console.log(LOG_PREFIX + 'No tokens available for GPT-3')
         await message.reply('Sorry, you have run out of GPT-3 tokens. `/tokens` to get more')
         guild.gpt3TokensAvailable = 0
         clearInterval(typingInterval)
@@ -587,7 +590,7 @@ client.on(Events.MessageCreate, async (message) => {
       }
     }
 
-    console.log('Generating response...')
+    console.log(LOG_PREFIX + 'Generating response...')
 
     let response = await openAiHelper.createChatCompletion(
       channel.messages.map((message) => message.chatCompletionRequestMessage),
@@ -615,7 +618,7 @@ client.on(Events.MessageCreate, async (message) => {
     // let's ensure our own response doesn't violate any moderation
     // rules
     if ((await openAiHelper.findModerationIndices([response])).length > 0) {
-      console.log('Response flagged: ' + response)
+      console.log(LOG_PREFIX + 'Response flagged: ' + response)
       clearInterval(typingInterval)
       await message.reply(channel.config.MODERATION_VIOLATION)
       return
@@ -637,13 +640,13 @@ client.on(Events.MessageCreate, async (message) => {
 
     await channel.addMessage(newMessage)
 
-    console.log('Response: ' + response)
+    console.log(LOG_PREFIX + 'Response: ' + response)
 
     // if this is the first assistant message, send the disclaimer first
     if (!channel.disclaimerSent && channel.config.DISCLAIMER.length > 0) {
       channel.setDisclaimerSent(true)
       response = channel.config.DISCLAIMER + '\n\n' + response
-      console.log('Adding disclaimer')
+      console.log(LOG_PREFIX + 'Adding disclaimer')
       await channel.save()
     }
 
@@ -683,10 +686,7 @@ client
     // print how many servers we're in
     console.log(
       `Connected to ${client.guilds.cache.size} ` +
-      `server(s) with ${client.guilds.cache.reduce(
-        (a, g) => a + g.memberCount,
-        0
-      )} user(s)`
+      'server(s)'
     )
   })
   .catch((e) => {
