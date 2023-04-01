@@ -42,7 +42,7 @@ export default async (client: Client<boolean>): Promise<void> => {
     reset,
     {
       name: 'config',
-      description: 'Configure the chat for this channel',
+      description: 'Configure the settings for this channel',
       defaultMemberPermissions: COMMAND_PERMISSIONS,
       options: [
         {
@@ -65,7 +65,8 @@ export default async (client: Client<boolean>): Promise<void> => {
         },
         {
           name: 'language_model',
-          description: 'Which language model to use (default: GPT-3.5 Turbo)',
+          description: 'Which language model to use (default: GPT-3.5 Turbo) GPT-4 is ' +
+            'more expensive',
           type: ApplicationCommandOptionType.String,
           required: true,
           choices: [
@@ -83,8 +84,12 @@ export default async (client: Client<boolean>): Promise<void> => {
     },
     {
       name: 'tokens',
-      description: 'Check how many tokens are available',
-      defaultMemberPermissions: COMMAND_PERMISSIONS
+      description: 'Check how many tokens are available and buy more'
+    },
+    {
+      name: 'who',
+      description: 'Check how this bot is is configured including any ' +
+        'system messages that are currently set'
     },
     {
       name: 'system',
@@ -111,6 +116,10 @@ export default async (client: Client<boolean>): Promise<void> => {
           type: ApplicationCommandOptionType.Subcommand
         }
       ]
+    },
+    {
+      name: 'help',
+      description: 'Get help with this bot'
     }
   ])
 }
