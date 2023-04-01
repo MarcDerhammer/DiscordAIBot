@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.8] - 2023-04-01
+
+### Fixed
+-   Fixed a bug related to max token count calculation
+
+### Added
+-   Added admin request to adjust balance and send messages
+
 ## [3.0.7] - 2023-04-01
+
+### Changed
+
+-   Adjusted max token calcuation
+-   Added some logging 
 
 ## [3.0.6] - 2023-04-01
 
@@ -58,7 +71,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.7...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.8...HEAD
+
+[3.0.8]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.7...3.0.8
 
 [3.0.7]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.6...3.0.7
 
