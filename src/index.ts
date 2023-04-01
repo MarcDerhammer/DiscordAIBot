@@ -558,34 +558,31 @@ client.on(Events.MessageCreate, async (message) => {
 
     console.log('Generating completion... messages in history')
 
-    // subtract from the guild's token count
+    // lastly ensure the guild is at least one week old to prevent abuse
+    if (((message.guild?.createdTimestamp) == null) ||
+        message.guild.createdTimestamp > Date.now() - 1000 * 60 * 60 * 24 * 7) {
+      await message.reply('Sorry. To prevent abuse, your server must be at ' +
+          'least one week old to use this bot')
+      clearInterval(typingInterval)
+      return
+    }
+
     if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
-      try {
-        await guild.subtractGpt4Tokens(channel.countTotalTokens())
-      } catch (error) {
-        console.error(error)
-        await message.reply('Sorry, you have run out of GPT-4 tokens')
+      if (guild.gpt4TokensAvailable <= 0) {
+        await message.reply('Sorry, you have run out of GPT-4 tokens. `/tokens` to get more')
         clearInterval(typingInterval)
+        guild.gpt4TokensAvailable = 0
+        await guild.save()
         return
       }
     } else {
-      try {
-        await guild.subtractGpt3Tokens(channel.countTotalTokens())
-      } catch (error) {
-        console.error(error)
-        await message.reply('Sorry, you have run out of GPT-3 tokens')
+      if (guild.gpt3TokensAvailable <= 0) {
+        await message.reply('Sorry, you have run out of GPT-3 tokens. `/tokens` to get more')
+        guild.gpt3TokensAvailable = 0
         clearInterval(typingInterval)
+        await guild.save()
         return
       }
-    }
-
-    // lastly ensure the guild is at least one week old to prevent abuse
-    if (((message.guild?.createdTimestamp) == null) ||
-      message.guild.createdTimestamp > Date.now() - 1000 * 60 * 60 * 24 * 7) {
-      await message.reply('Sorry. To prevent abuse, your server must be at ' +
-        'least one week old to use this bot')
-      clearInterval(typingInterval)
-      return
     }
 
     let response = await openAiHelper.createChatCompletion(
@@ -593,6 +590,23 @@ client.on(Events.MessageCreate, async (message) => {
       channel.config.LANGUAGE_MODEL,
       message.author.id
     )
+
+    // subtract from the guild's token count
+    if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
+      try {
+        await guild.subtractGpt4Tokens(channel.countTotalTokens())
+      } catch (error) {
+        console.error(error)
+        return
+      }
+    } else {
+      try {
+        await guild.subtractGpt3Tokens(channel.countTotalTokens())
+      } catch (error) {
+        console.error(error)
+        return
+      }
+    }
 
     // let's ensure our own response doesn't violate any moderation
     // rules
