@@ -51,12 +51,12 @@ export default async (client: Client<boolean>): Promise<void> => {
           type: ApplicationCommandOptionType.Boolean,
           required: true
         },
-        {
-          name: 'ignore_bots',
-          description: 'Ignore messages from bots (default: true)',
-          type: ApplicationCommandOptionType.Boolean,
-          required: true
-        },
+        // {
+        //   name: 'ignore_bots',
+        //   description: 'Ignore messages from bots (default: true)',
+        //   type: ApplicationCommandOptionType.Boolean,
+        //   required: true
+        // },
         {
           name: 'ignore_everyone_mentions',
           description: 'Ignore @everyone and @here (default: true)',

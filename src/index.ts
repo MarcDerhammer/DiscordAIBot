@@ -7,7 +7,7 @@ import {
 
 import {
   Client, type CommandInteraction,
-  Events, GatewayIntentBits, TextChannel
+  Events, GatewayIntentBits
 } from 'discord.js'
 import { getEnv } from './env'
 
@@ -170,7 +170,7 @@ commands.set('who', async (interaction) => {
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     `\`ONLY_RESPOND_TO_MENTIONS\`: ${channel.config.ONLY_RESPOND_TO_MENTIONS}\n` +
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    `\`IGNORE_BOTS\`: ${channel.config.IGNORE_BOTS}\n` +
+    // `\`IGNORE_BOTS\`: ${channel.config.IGNORE_BOTS}\n` +
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     `\`IGNORE_EVERYONE_MENTIONS\`: ${channel.config.IGNORE_EVERYONE_MENTIONS}\n` +
     `\`LANGUAGE_MODEL\`: ${channel.config.LANGUAGE_MODEL}` +
@@ -191,7 +191,7 @@ commands.set('config', async (interaction) => {
   }
   // pull out the options
   const onlyMentions = interaction.options.get('only_mentions')?.value as boolean ?? true
-  const ignoreBots = interaction.options.get('ignore_bots')?.value as boolean ?? true
+  // const ignoreBots = interaction.options.get('ignore_bots')?.value as boolean ?? true
   const ignoreEveryoneMentions =
     interaction.options.get('ignore_everyone_mentions')?.value as boolean ?? true
   const languageModel = interaction.options.get('language_model')?.value as string ??
@@ -199,7 +199,7 @@ commands.set('config', async (interaction) => {
 
   const configPartial: Partial<ChannelConfig> = {
     ONLY_RESPOND_TO_MENTIONS: onlyMentions ?? true,
-    IGNORE_BOTS: ignoreBots,
+    IGNORE_BOTS: true,
     IGNORE_EVERYONE_MENTIONS: ignoreEveryoneMentions,
     LANGUAGE_MODEL: languageModel
   }
@@ -242,7 +242,7 @@ commands.set('config', async (interaction) => {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       `\`ONLY_RESPOND_TO_MENTIONS\`: ${channel.config.ONLY_RESPOND_TO_MENTIONS}\n` +
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      `\`IGNORE_BOTS\`: ${channel.config.IGNORE_BOTS}\n` +
+      // `\`IGNORE_BOTS\`: ${channel.config.IGNORE_BOTS}\n` +
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       `\`IGNORE_EVERYONE_MENTIONS\`: ${channel.config.IGNORE_EVERYONE_MENTIONS}\n` +
       `\`LANGUAGE_MODEL\`: ${channel.config.LANGUAGE_MODEL}`
