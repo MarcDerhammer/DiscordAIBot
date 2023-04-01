@@ -17,7 +17,7 @@ export const DEFAULT_GUILD_CONFIG: ChannelConfig = {
 }
 
 const GPT3_TOKENS_AVAILABLE = 2000000
-const GPT4_TOKENS_AVAILABLE = 80000
+const GPT4_TOKENS_AVAILABLE = 40000
 
 const isRunningInDocker = (): boolean => {
   return fs.existsSync('/.dockerenv')
@@ -34,11 +34,16 @@ export class Guild {
   gpt3TokensAvailable: number
   gpt4TokensAvailable: number
 
-  constructor (id: string, defaultConfig: ChannelConfig) {
+  constructor (
+    id: string,
+    defaultConfig: ChannelConfig,
+    gpt3TokensAvailable: number = GPT3_TOKENS_AVAILABLE,
+    gpt4TokensAvailable: number = GPT4_TOKENS_AVAILABLE
+  ) {
     this.id = id
     this.channels = new Map()
-    this.gpt3TokensAvailable = GPT3_TOKENS_AVAILABLE
-    this.gpt4TokensAvailable = GPT4_TOKENS_AVAILABLE
+    this.gpt3TokensAvailable = gpt3TokensAvailable
+    this.gpt4TokensAvailable = gpt4TokensAvailable
     this.defaultConfig = defaultConfig
   }
 

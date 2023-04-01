@@ -14,8 +14,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
     ports:
-      - "8000:8000" # Map the host's port 8000 to the container's port 8000
+      - "3005:3005" # Map the host's port 8000 to the container's port 8000
     links:
       - mongodb
     networks:

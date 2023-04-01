@@ -16,7 +16,7 @@ import { DEFAULT_GUILD_CONFIG, Guild } from './messages/Guild'
 import { type ChannelConfig } from './messages/ChannelConfig'
 import { Channel } from './messages/Channel'
 import RegisterCommands from './commands/RegisterCommands'
-import generateCheckout, { handleWebHook } from './stripe/Checkout'
+import generateCheckout, { handleWebHook, TOKEN_TYPE } from './stripe/Checkout'
 import express from 'express'
 import bodyParser from 'body-parser'
 import { Message } from './messages/Message'
@@ -47,16 +47,21 @@ const guilds = new Map<string, Guild>();
 (async () => {
   // load up all the guilds and messages
   const guildsCollection = mongoClient.db('discord').collection('guilds')
-  const guildsCursor = await guildsCollection.find()
+  const guildsCursor = guildsCollection.find()
   const guildsDocs = await guildsCursor.toArray()
   for (const guildDoc of guildsDocs) {
-    const guild = new Guild(guildDoc.id, guildDoc.config)
+    const guild = new Guild(
+      guildDoc.id,
+      guildDoc.config,
+      guildDoc.gpt3TokensAvailable,
+      guildDoc.gpt4TokensAvailable
+    )
     guilds.set(guild.id, guild)
     // now look up all the channels for this guild
     const channelsCollection = mongoClient.db('discord').collection('channels')
 
     // query where guildId = guild.id
-    const channelsCursor = await channelsCollection.find({ guildId: guild.id })
+    const channelsCursor = channelsCollection.find({ guildId: guild.id })
     const channelsDocs = await channelsCursor.toArray()
 
     // Process the channels as needed
@@ -75,7 +80,7 @@ const guilds = new Map<string, Guild>();
       const messagesCollection = mongoClient.db('discord').collection('messages')
 
       // query where channelId = channelDoc.id
-      const messagesCursor = await messagesCollection.find({ channelId: channelDoc.id })
+      const messagesCursor = messagesCollection.find({ channelId: channelDoc.id })
       const messagesDocs = await messagesCursor.toArray()
 
       // Process the messages as needed
@@ -116,29 +121,7 @@ app.use((req, res, next) => {
 // use raw payload for stripe
 // eslint-disable-next-line @typescript-eslint/no-misused-promises
 app.post('/stripe', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
-  const result = await handleWebHook(req, res, guilds)
-  if (!result.success) {
-    res.status(500).send('Error')
-    return
-  }
-
-  if (result.channelId === undefined || result.tokens === undefined) {
-    res.status(500).send('Error')
-    return
-  }
-
-  // get the channel and send a message
-  const channel = await client.channels.fetch(result.channelId)
-  if (channel instanceof TextChannel) {
-    if ((result.anonymous ?? false) || result.userId == null || result.userId.length === 0) {
-      await channel.send('An anonymous user purchased ' +
-        `${result.tokens.toLocaleString()} tokens for ${result.type ?? ''}`)
-    } else {
-      await channel.send(`<@${result.userId}> purchased ` +
-      `${result.tokens.toLocaleString()} tokens for ${result.type ?? ''}!`)
-    }
-  }
-  res.send('Success')
+  await handleWebHook(req, res, guilds, client)
 })
 
 client.once(Events.ClientReady, async () => {
@@ -153,6 +136,53 @@ const commands = new Map<
 string,
 (interaction: CommandInteraction) => Promise<void>
 >()
+commands.set('who', async (interaction) => {
+  // print the configuration options and print any system messages that are currently set
+  if (interaction.guildId == null) {
+    await interaction.reply({
+      content: 'This command can only be used in a server',
+      ephemeral: true
+    })
+    return
+  }
+  const guild = guilds.get(interaction.guildId)
+  if (guild == null) {
+    await interaction.reply({
+      content: 'This command can only be used in a server',
+      ephemeral: true
+    })
+    return
+  }
+
+  const channel = guild.channels.get(interaction.channelId)
+  if (channel == null) {
+    await interaction.reply({
+      content: 'This channel is not configured',
+      ephemeral: true
+    })
+    return
+  }
+
+  const messages =
+      channel.messages.filter(
+        (x) => x.chatCompletionRequestMessage.role === ChatCompletionResponseMessageRoleEnum.System)
+  const messageList = messages.map((m) => m.content).join('\n • ')
+
+  const response = 'Channel configured with the following settings: \n' +
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+    `\`ONLY_RESPOND_TO_MENTIONS\`: ${channel.config.ONLY_RESPOND_TO_MENTIONS}\n` +
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+    `\`IGNORE_BOTS\`: ${channel.config.IGNORE_BOTS}\n` +
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+    `\`IGNORE_EVERYONE_MENTIONS\`: ${channel.config.IGNORE_EVERYONE_MENTIONS}\n` +
+    `\`LANGUAGE_MODEL\`: ${channel.config.LANGUAGE_MODEL}` +
+    `\n\nSystem messages: \n • ${messageList}`
+
+  await interaction.reply({
+    content: response,
+    ephemeral: true
+  })
+})
 commands.set('config', async (interaction) => {
   if (interaction.guildId == null) {
     await interaction.reply({
@@ -241,16 +271,28 @@ commands.set('tokens', async (interaction) => {
   const gpt3Tokens = guild.gpt3TokensAvailable.toLocaleString()
   const gpt4Tokens = guild.gpt4TokensAvailable.toLocaleString()
 
-  const tokenUrl = await generateCheckout(
+  const gpt3checkout = await generateCheckout(
     interaction.guildId,
     interaction.guild?.name ?? '',
     interaction.user.id,
-    interaction.channelId
+    interaction.channelId,
+    TOKEN_TYPE.GPT_3
+  )
+
+  const gpt4checkout = await generateCheckout(
+    interaction.guildId,
+    interaction.guild?.name ?? '',
+    interaction.user.id,
+    interaction.channelId,
+    TOKEN_TYPE.GPT_4
   )
 
   await interaction.reply({
-    content: `Tokens Remaining: \nGPT-3: ${gpt3Tokens}` +
-      `\nGPT-4: ${gpt4Tokens}\n\n[Buy more tokens for this server](${tokenUrl})`,
+    content: `Tokens Remaining: \n\`GPT-3: ${gpt3Tokens}\`` +
+      `\n\`GPT-4: ${gpt4Tokens}\`\n\nBuy more: [GPT-3](${gpt3checkout}) - ` +
+      `[GPT-4](${gpt4checkout})\n` +
+      'Note: GPT-4 is more powerful, but also more expensive.  Tokens are shared with the entire ' +
+      'server.',
     ephemeral: true
   })
 })
@@ -342,9 +384,9 @@ commands.set('system', async (interaction) => {
     const messages =
       channel.messages.filter(
         (x) => x.chatCompletionRequestMessage.role === ChatCompletionResponseMessageRoleEnum.System)
-    const messageList = messages.map((m) => m.content).join('\n')
+    const messageList = messages.map((m) => m.content).join('\n • ')
     await interaction.reply({
-      content: `System messages: \n${messageList}`
+      content: `System messages: \n • ${messageList}`
     })
     return
   }
@@ -374,6 +416,18 @@ commands.set('system', async (interaction) => {
   await channel.addMessage(newMessage)
   await interaction.reply({
     content: `System message added by <@${interaction.user.id}>: \n${message}`
+  })
+})
+
+commands.set('help', async (interaction) => {
+  await interaction.reply({
+    content: 'Commands: \n' +
+      '`/tokens `Check how many tokens this server has left and links to buy more \n' +
+      '`/config `Configure the bot for this channel (Admin only) \n' +
+      '`/reset  `Reset the bot for this channel (Admin only)\n' +
+      '`/system `Add a system message to the bot (Admin only) \n' +
+      '`/help   `Show this message',
+    ephemeral: true
   })
 })
 

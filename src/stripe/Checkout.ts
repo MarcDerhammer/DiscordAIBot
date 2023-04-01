@@ -1,6 +1,23 @@
 import Stripe from 'stripe'
 import { type Guild } from '../messages/Guild'
 import { type Request, type Response } from 'express'
+import { Client, TextChannel } from 'discord.js'
+
+const GPT_3_PRICE_PER_TOKEN = 0.003 / 1000
+const GPT_4_PRICE_PER_TOKEN = 0.05 / 1000
+
+const GPT_3_UNIT_AMOUNT = 1000000
+const GPT_4_UNIT_AMOUNT = 50000
+
+const GPT_3_PRICE_PER_UNIT = GPT_3_PRICE_PER_TOKEN * GPT_3_UNIT_AMOUNT * 100
+const GPT_4_PRICE_PER_UNIT = GPT_4_PRICE_PER_TOKEN * GPT_4_UNIT_AMOUNT * 100
+
+const GPT_3_MESSAGE = 'Tokens are used to generate messages. ' +
+'Using OpenAI\'s GPT-3.5-Turbo model, ' +
+'one message using a full "memory" is 4,096 tokens.'
+
+const GPT_4_MESSAGE = 'Tokens are used to generate messages.  Using OpenAI\'s GPT-4 model, ' +
+'one message using a full "memory" is 8,192 tokens.'
 
 if (
   process.env.STRIPE_SECRET_KEY?.length === 0 ||
@@ -15,6 +32,11 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 export const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
 
+export enum TOKEN_TYPE {
+  GPT_3 = 'GPT-3',
+  GPT_4 = 'GPT-4'
+}
+
 export interface WebhookResponse {
   success: boolean
   anonymous?: boolean
@@ -27,8 +49,9 @@ export interface WebhookResponse {
 export async function handleWebHook (
   req: Request,
   res: Response,
-  guilds: Map<string, Guild>
-): Promise<WebhookResponse> {
+  guilds: Map<string, Guild>,
+  client: Client
+): Promise<void> {
   try {
     if (WEBHOOK_SECRET === undefined || WEBHOOK_SECRET.length === 0) {
       throw new Error(
@@ -68,18 +91,15 @@ export async function handleWebHook (
       if (quantity === undefined) {
         quantity = 0
       }
-      const type = session.line_items?.data[0].description as string
+      const type = (session.line_items?.data[0].description as string).includes(TOKEN_TYPE.GPT_3)
+        ? TOKEN_TYPE.GPT_3
+        : TOKEN_TYPE.GPT_4
 
       const channelId = session.metadata?.channel_id as string
       const channel = guild.channels.get(channelId)
       if (channel === undefined) {
         throw new Error('Channel not found')
       }
-
-      const totalToAdd = quantity * 1000000
-
-      guild.gpt3TokensAvailable += totalToAdd
-      await guild.save()
 
       // Extract the custom_fields for "anonymous" key
       let anonymousValue = true
@@ -90,20 +110,33 @@ export async function handleWebHook (
         }
       }
 
-      return {
-        success: true,
-        anonymous: anonymousValue,
-        userId,
-        channelId,
-        type: type.includes('GPT-3') ? 'GPT-3' : 'GPT-4',
-        tokens: totalToAdd
+      const scale = type === TOKEN_TYPE.GPT_3 ? GPT_3_UNIT_AMOUNT : GPT_4_UNIT_AMOUNT
+      const totalToAdd = quantity * scale
+
+      if (type === TOKEN_TYPE.GPT_3) {
+        guild.gpt3TokensAvailable += totalToAdd
+      } else {
+        guild.gpt4TokensAvailable += totalToAdd
       }
+      await guild.save()
+
+      const discordChannel = await client.channels.fetch(channelId)
+
+      if (discordChannel instanceof TextChannel) {
+        if ((anonymousValue ?? false) || userId == null || userId.length === 0) {
+          await discordChannel.send('An anonymous user purchased ' +
+            `${totalToAdd.toLocaleString()} tokens for ${type ?? ''}`)
+        } else {
+          await discordChannel.send(`<@${userId}> purchased ` +
+          `${totalToAdd.toLocaleString()} tokens for ${type ?? ''}!`)
+        }
+      }
+      res.send('Success')
     }
   } catch (err) {
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+    res.status(500).send(`Webhook Error: ${err.message}`)
     console.error(err)
-  }
-  return {
-    success: false
   }
 }
 
@@ -111,15 +144,34 @@ export default async function generateCheckout (
   serverId: string,
   serverName: string,
   purchaserId: string,
-  channelId: string
+  channelId: string,
+  type: TOKEN_TYPE
 ): Promise<string> {
+  const SHORT_FORMAT_NUMBER = type === TOKEN_TYPE.GPT_3
+    ? Intl.NumberFormat('en-US', {
+      notation: 'compact',
+      compactDisplay: 'short'
+    }).format(GPT_3_UNIT_AMOUNT)
+    : Intl.NumberFormat('en-US', {
+      notation: 'compact',
+      compactDisplay: 'short'
+    }).format(GPT_4_UNIT_AMOUNT)
+
+  const LONG_FORMAT_NUMBER = type === TOKEN_TYPE.GPT_3
+    ? Intl.NumberFormat('en-US', {
+      notation: 'compact',
+      compactDisplay: 'long'
+    }).format(GPT_3_UNIT_AMOUNT)
+
+    : Intl.NumberFormat('en-US', {
+      notation: 'compact',
+      compactDisplay: 'long'
+    }).format(GPT_4_UNIT_AMOUNT)
+
   const session = await stripe.checkout.sessions.create({
     custom_text: {
       submit: {
-        message:
-          "Tokens are used to generate messages.  Using OpenAI's GPT-3.5-Turbo model, " +
-          'one message using a full "memory" is 4,096 tokens.  So 1 Million tokens will ' +
-          'generate around 250 messages. \n' +
+        message: (type === TOKEN_TYPE.GPT_3 ? GPT_3_MESSAGE : GPT_4_MESSAGE) +
           'Please note that this balance will be added to ' +
           "the entire server's balance." +
           'Your email is not shared with the server but if you selected "No" for anonymous, ' +
@@ -135,16 +187,15 @@ export default async function generateCheckout (
         adjustable_quantity: {
           enabled: true,
           minimum: 1,
-          maximum: 100
+          maximum: 50
         },
         price_data: {
           currency: 'usd',
           product_data: {
-            name: '1 Million GPT-3 Tokens',
-            description:
-              'GPT-3 Tokens for Discord Server: "' + serverName + '"'
+            name: `${SHORT_FORMAT_NUMBER} ${type} Tokens`,
+            description: `${LONG_FORMAT_NUMBER} ${type} Tokens for Discord Server: ${serverName}`
           },
-          unit_amount: 300
+          unit_amount: type === TOKEN_TYPE.GPT_3 ? GPT_3_PRICE_PER_UNIT : GPT_4_PRICE_PER_UNIT
         }
       }
     ],
