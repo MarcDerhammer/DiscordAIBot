@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.3] - 2023-04-01
+
 ### Changed
+
 -   Minimum age on servers to prevent abuse
 
 ## [3.0.2] - 2023-04-01
@@ -35,7 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.2...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.3...HEAD
+
+[3.0.3]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.2...3.0.3
 
 [3.0.2]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.1...3.0.2
 
