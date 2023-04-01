@@ -250,6 +250,7 @@ commands.set('config', async (interaction) => {
 })
 
 commands.set('tokens', async (interaction) => {
+  console.log('Tokens command from ' + interaction.user.id)
   if (interaction.guildId == null) {
     await interaction.reply({
       content: 'This command can only be used in a server',
@@ -343,6 +344,7 @@ commands.set('reset', async (interaction) => {
   if (type === 'system') {
     channel.removeMessagesByType(ChatCompletionResponseMessageRoleEnum.System)
   }
+  console.log(`${guild.id}:${channel.id}: ${interaction.user.id} Cleared ${type} messages`)
   await interaction.reply({
     content: `${type.toUpperCase()} messages have been cleared by <@${interaction.user.id}>`
   })
@@ -412,6 +414,8 @@ commands.set('system', async (interaction) => {
   })
 
   await channel.addMessage(newMessage)
+  const LOG_PREFIX = `${interaction.guildId}:${interaction.channelId}:`
+  console.log(LOG_PREFIX, `System message added by ${interaction.user.id} ${message}`)
   await interaction.reply({
     content: `System message added by <@${interaction.user.id}>: \n${message}`
   })
@@ -573,7 +577,8 @@ client.on(Events.MessageCreate, async (message) => {
     if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
       if (guild.gpt4TokensAvailable <= 0) {
         console.log(LOG_PREFIX + 'No tokens available for GPT-4')
-        await message.reply('Sorry, you have run out of GPT-4 tokens. `/tokens` to get more')
+        await message.reply('Sorry, you have run out of GPT-4 tokens. `/tokens` to get more or ' +
+        '`/config` to switch to GPT-3')
         clearInterval(typingInterval)
         guild.gpt4TokensAvailable = 0
         await guild.save()
