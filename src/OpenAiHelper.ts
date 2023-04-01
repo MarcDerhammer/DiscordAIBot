@@ -46,10 +46,9 @@ export class OpenAiHelper {
   async createChatCompletion (
     messages: ChatCompletionRequestMessage[],
     languageModel: string,
-    user?: string,
-    totalMaxTokens?: number
+    user?: string
   ): Promise<string> {
-    const MAX_TOKEN_COUNT = getMaxTokens(languageModel as Model, totalMaxTokens) -
+    const MAX_TOKEN_COUNT = getMaxTokens(languageModel as Model) -
       countTokens(messages)
 
     if (MAX_TOKEN_COUNT <= 0) {

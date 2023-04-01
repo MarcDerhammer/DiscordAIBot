@@ -6,7 +6,6 @@ import { DEFAULT_MODERATION_VIOATION_RESPONSE, DISCLAIMER } from '../env'
 import { mongoClient } from '../mongo/MongoClient'
 
 export const DEFAULT_GUILD_CONFIG: ChannelConfig = {
-  MAX_TOKENS_PER_MESSAGE: Number.MAX_SAFE_INTEGER,
   ERROR_RESPONSE: 'Sorry, there was an error. Please try again later.',
   MODERATION_VIOLATION: DEFAULT_MODERATION_VIOATION_RESPONSE,
   ONLY_RESPOND_TO_MENTIONS: true,
