@@ -15,6 +15,7 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
     ports:
       - "3005:3005" # Map the host's port 8000 to the container's port 8000
     links:
