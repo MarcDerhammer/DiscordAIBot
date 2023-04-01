@@ -66,7 +66,6 @@ const guilds = new Map<string, Guild>();
 
     // Process the channels as needed
     for (const channelDoc of channelsDocs) {
-      console.log('Channel:', channelDoc)
       // Perform operations with the channelDoc
       const channel = new Channel(
         channelDoc.id,
@@ -85,7 +84,6 @@ const guilds = new Map<string, Guild>();
 
       // Process the messages as needed
       for (const messageDoc of messagesDocs) {
-        console.log('Message:', messageDoc)
         const message = new Message({
           id: messageDoc.id,
           guildId: messageDoc.guildId,
