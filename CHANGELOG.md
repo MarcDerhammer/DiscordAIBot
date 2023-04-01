@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.8] - 2023-04-01
 
+### Fixed
+-   Fixed a bug related to max token count calculation
+
+### Added
+-   Added admin request to adjust balance and send messages
+
 ## [3.0.7] - 2023-04-01
 
 ## [3.0.6] - 2023-04-01
