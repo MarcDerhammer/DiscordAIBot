@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.4] - 2023-04-01
+
 ### Changed
+
 -   Don't subtract from balance until a response is successfully generated
 
 ## [3.0.3] - 2023-04-01
@@ -41,7 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.3...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.4...HEAD
+
+[3.0.4]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.3...3.0.4
 
 [3.0.3]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.2...3.0.3
 
