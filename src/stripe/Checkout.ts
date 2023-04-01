@@ -1,7 +1,7 @@
 import Stripe from 'stripe'
 import { type Guild } from '../messages/Guild'
 import { type Request, type Response } from 'express'
-import { Client, TextChannel } from 'discord.js'
+import { type Client, TextChannel } from 'discord.js'
 
 const GPT_3_PRICE_PER_TOKEN = 0.003 / 1000
 const GPT_4_PRICE_PER_TOKEN = 0.05 / 1000
@@ -179,8 +179,8 @@ export default async function generateCheckout (
       }
     },
     payment_method_types: ['card', 'cashapp'],
-    success_url: 'https://google.com/',
-    cancel_url: 'https://bing.com',
+    success_url: 'https://discordai.chat/payment',
+    cancel_url: 'https://discordai.chat',
     line_items: [
       {
         quantity: 1,
