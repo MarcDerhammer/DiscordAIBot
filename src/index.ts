@@ -21,10 +21,14 @@ import express from 'express'
 import bodyParser from 'body-parser'
 import { Message } from './messages/Message'
 import { mongoClient } from './mongo/MongoClient'
+import { Ntfy } from './ntfy/Ntfy'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
 const ADMIN_API_KEY = getEnv('ADMIN_API_KEY')
+const NTFY_TOPIC = getEnv('NTFY_TOPIC')
+
+export const ntfy = new Ntfy(NTFY_TOPIC)
 
 const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
@@ -287,6 +291,7 @@ commands.set('config', async (interaction) => {
   if (guild == null) {
     guild = new Guild(interaction.guildId, DEFAULT_GUILD_CONFIG)
     guilds.set(interaction.guildId, guild)
+    void ntfy.publish('New Server', 'A new server has been added to the bot', 'partying_face')
   }
 
   // get the channel config
@@ -541,6 +546,7 @@ client.on(Events.MessageCreate, async (message) => {
       guild = new Guild(message.guildId, DEFAULT_GUILD_CONFIG)
       guilds.set(message.guildId, guild)
       await guild.save()
+      void ntfy.publish('New Server', 'A new server has been added to the bot', 'partying_face')
     }
 
     const channel = await guild.getChannel(message.channelId)
@@ -765,6 +771,9 @@ setInterval(() => {
 client
   .login(DISCORD_TOKEN)
   .then(async () => {
+    console.log(NTFY_TOPIC)
+    console.log('Sending notification to ntfy.sh')
+    await ntfy.publish('The server has started', 'Discord AI Bot Started', 'robot')
     console.log('Logged in!')
     // print how many servers we're in
     console.log(
@@ -774,6 +783,7 @@ client
   })
   .catch((e) => {
     console.error(e)
+    void ntfy.publish('The server has failed to start', 'Discord AI Bot Failed to Start', 'robot')
   })
 
 // add express endpoint to handle stripe payments
