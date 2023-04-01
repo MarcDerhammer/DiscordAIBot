@@ -468,6 +468,7 @@ client.on(Events.MessageCreate, async (message) => {
 
   if (channel == null) {
     if (message.mentions.users.has(client.user.id)) {
+      console.error('Channel not found, but mentioned, replying with /config message')
       await message.reply(
         'This channel is not configured for chatting with me.  ' +
         'Someone with permissions needs to run `/config` to configure this channel.')
@@ -556,11 +557,10 @@ client.on(Events.MessageCreate, async (message) => {
       return
     }
 
-    console.log('Generating completion... messages in history')
-
     // lastly ensure the guild is at least one week old to prevent abuse
     if (((message.guild?.createdTimestamp) == null) ||
         message.guild.createdTimestamp > Date.now() - 1000 * 60 * 60 * 24 * 7) {
+      console.log('Guild is too new, ignoring')
       await message.reply('Sorry. To prevent abuse, your server must be at ' +
           'least one week old to use this bot')
       clearInterval(typingInterval)
@@ -569,6 +569,7 @@ client.on(Events.MessageCreate, async (message) => {
 
     if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
       if (guild.gpt4TokensAvailable <= 0) {
+        console.log('No tokens available for GPT-4')
         await message.reply('Sorry, you have run out of GPT-4 tokens. `/tokens` to get more')
         clearInterval(typingInterval)
         guild.gpt4TokensAvailable = 0
@@ -577,6 +578,7 @@ client.on(Events.MessageCreate, async (message) => {
       }
     } else {
       if (guild.gpt3TokensAvailable <= 0) {
+        console.log('No tokens available for GPT-3')
         await message.reply('Sorry, you have run out of GPT-3 tokens. `/tokens` to get more')
         guild.gpt3TokensAvailable = 0
         clearInterval(typingInterval)
@@ -584,6 +586,8 @@ client.on(Events.MessageCreate, async (message) => {
         return
       }
     }
+
+    console.log('Generating response...')
 
     let response = await openAiHelper.createChatCompletion(
       channel.messages.map((message) => message.chatCompletionRequestMessage),
