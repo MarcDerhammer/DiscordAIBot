@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.7] - 2023-04-01
 
+### Changed
+
+-   Adjusted max token calcuation
+-   Added some logging 
+
 ## [3.0.6] - 2023-04-01
 
 ### Changed
