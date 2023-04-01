@@ -124,6 +124,7 @@ app.use((req, res, next) => {
 // use raw payload for stripe
 // eslint-disable-next-line @typescript-eslint/no-misused-promises
 app.post('/stripe', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
+  void ntfy.publish('Stripe Payment Received', 'A payment was received!!', 'moneybag')
   await handleWebHook(req, res, guilds, client)
 })
 
