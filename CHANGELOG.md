@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.0] - 2023-04-01
 
+### Changed
+- Totally changed this to be a sort of SAAS kind of thing
+- Stripe purchase integration
+- Commands to config
+- Persist to mongo instead of json files
+
 ## [2.0.1] - 2023-03-29
 
 Initial Release (sort of)
