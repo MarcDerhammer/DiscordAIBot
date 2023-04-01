@@ -1,21 +1,30 @@
 import {
-  ChatCompletionRequestMessageRoleEnum,
-  type ChatCompletionRequestMessage
+  ChatCompletionRequestMessageRoleEnum
 } from 'openai'
+import { mongoClient } from '../mongo/MongoClient'
 import { countTokens } from '../OpenAiHelper'
 import { type ChannelConfig } from './ChannelConfig'
+import { type Message } from './Message'
+
+const EXTRA_TOKENS_BUFFER = 500
 
 export class Channel {
   id: string
-  messages: ChatCompletionRequestMessage[]
+  messages: Message[]
   config: ChannelConfig
   disclaimerSent: boolean
+  guildId: string
 
-  constructor (id: string, config: ChannelConfig) {
+  constructor (
+    id: string,
+    guildId: string,
+    config: ChannelConfig,
+    disclaimerSent?: boolean) {
     this.id = id
     this.messages = []
     this.config = config
-    this.disclaimerSent = false
+    this.disclaimerSent = disclaimerSent ?? false
+    this.guildId = guildId
   }
 
   setDisclaimerSent (disclaimerSent: boolean): void {
@@ -27,16 +36,22 @@ export class Channel {
     this.clearMessages()
   }
 
-  addMessage (message: ChatCompletionRequestMessage): void {
-    this.messages.push(message)
+  countTotalTokens (): number {
+    return countTokens(this.messages.map((message) => message.chatCompletionRequestMessage))
+  }
 
-    while (countTokens(this.messages) > this.config.MAX_TOKENS_PER_MESSAGE) {
+  async addMessage (message: Message): Promise<void> {
+    this.messages.push(message)
+    await message.save()
+
+    while (this.countTotalTokens() > this.config.MAX_TOKENS_PER_MESSAGE + EXTRA_TOKENS_BUFFER) {
       console.log('Removing message to avoid exceeding max token count')
       // remove the first non-system message
       const index = this.messages.findIndex(
         (message) =>
-          message.role !== ChatCompletionRequestMessageRoleEnum.System
+          message.chatCompletionRequestMessage.role !== ChatCompletionRequestMessageRoleEnum.System
       )
+      await this.messages[index].delete()
       this.messages.splice(index, 1)
       if (index === -1) {
         // no non-system messages found.. but we still need to break to avoid loop
@@ -48,7 +63,6 @@ export class Channel {
   clearMessages (): void {
     console.log('Clearing conversation for channel: ' + this.id)
     // await all of these to run in parallel
-
     this.removeMessagesByType(ChatCompletionRequestMessageRoleEnum.User)
     this.removeMessagesByType(ChatCompletionRequestMessageRoleEnum.Assistant)
     this.removeMessagesByType(ChatCompletionRequestMessageRoleEnum.System)
@@ -58,22 +72,23 @@ export class Channel {
     role: ChatCompletionRequestMessageRoleEnum
   ): void {
     this.messages = [
-      ...this.messages.filter((message) => message.role !== role)
+      ...this.messages.filter((message) => message.chatCompletionRequestMessage.role !== role)
     ]
   }
 
-  static load (json: string): Channel {
-    try {
-      const jsonObj = JSON.parse(json)
-
-      const channel = new Channel(jsonObj.id, jsonObj.config)
-      channel.messages = jsonObj.messages
-      channel.disclaimerSent = jsonObj.disclaimerSent
-
-      return channel
-    } catch (e) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Error loading Channel from JSON: ${e.message}`)
-    }
+  async save (): Promise<void> {
+    const channelCollection = mongoClient.db('discord').collection('channels')
+    await channelCollection.updateOne(
+      { id: this.id },
+      {
+        $set: {
+          id: this.id,
+          guildId: this.guildId,
+          config: this.config,
+          disclaimerSent: this.disclaimerSent
+        }
+      },
+      { upsert: true }
+    )
   }
 }

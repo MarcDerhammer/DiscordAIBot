@@ -7,16 +7,20 @@ import {
 
 import {
   Client, type CommandInteraction,
-  Events, GatewayIntentBits
+  Events, GatewayIntentBits, TextChannel
 } from 'discord.js'
 import { getEnv } from './env'
 
-import { countTokens, OpenAiHelper } from './OpenAiHelper'
-import fs from 'fs'
-import { DEFAULT_GUILD_CONFIG, Guild, GUILD_DIRECTORY } from './messages/Guild'
+import { OpenAiHelper } from './OpenAiHelper'
+import { DEFAULT_GUILD_CONFIG, Guild } from './messages/Guild'
 import { type ChannelConfig } from './messages/ChannelConfig'
 import { Channel } from './messages/Channel'
 import RegisterCommands from './commands/RegisterCommands'
+import generateCheckout, { handleWebHook, TOKEN_TYPE } from './stripe/Checkout'
+import express from 'express'
+import bodyParser from 'body-parser'
+import { Message } from './messages/Message'
+import { mongoClient } from './mongo/MongoClient'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
@@ -37,27 +41,92 @@ const client = new Client({
 })
 
 // const channels = new Map<string, Channel>()
-const guilds = new Map<string, Guild>()
+const guilds = new Map<string, Guild>();
+
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
+(async () => {
+  // load up all the guilds and messages
+  const guildsCollection = mongoClient.db('discord').collection('guilds')
+  const guildsCursor = guildsCollection.find()
+  const guildsDocs = await guildsCursor.toArray()
+  for (const guildDoc of guildsDocs) {
+    const guild = new Guild(
+      guildDoc.id,
+      guildDoc.config,
+      guildDoc.gpt3TokensAvailable,
+      guildDoc.gpt4TokensAvailable
+    )
+    guilds.set(guild.id, guild)
+    // now look up all the channels for this guild
+    const channelsCollection = mongoClient.db('discord').collection('channels')
+
+    // query where guildId = guild.id
+    const channelsCursor = channelsCollection.find({ guildId: guild.id })
+    const channelsDocs = await channelsCursor.toArray()
+
+    // Process the channels as needed
+    for (const channelDoc of channelsDocs) {
+      // Perform operations with the channelDoc
+      const channel = new Channel(
+        channelDoc.id,
+        guild.id,
+        channelDoc.config,
+        channelDoc.disclaimerSent
+      )
+      guild.channels.set(channelDoc.id, channel)
+
+      // Get all messages for the current channel
+      const messagesCollection = mongoClient.db('discord').collection('messages')
+
+      // query where channelId = channelDoc.id
+      const messagesCursor = messagesCollection.find({ channelId: channelDoc.id })
+      const messagesDocs = await messagesCursor.toArray()
+
+      // Process the messages as needed
+      for (const messageDoc of messagesDocs) {
+        const message = new Message({
+          id: messageDoc.id,
+          guildId: messageDoc.guildId,
+          channelId: messageDoc.channelId,
+          userId: messageDoc.userId,
+          content: messageDoc.content,
+          timestamp: messageDoc.timestamp,
+          type: messageDoc.type,
+          chatCompletionRequestMessage: messageDoc.chatCompletionRequestMessage
+        })
+        channel.messages.push(message)
+      }
+    }
+  }
+})()
+
+const app = express()
+// get post body too
+const port = 3005
+app.get('/ping', (req, res) => {
+  res.send('pong')
+})
+
+// Use JSON parser for all non-webhook routes
+app.use((req, res, next) => {
+  if (req.originalUrl === '/stripe') {
+    next()
+  } else {
+    bodyParser.json()(req, res, next)
+  }
+})
+
+// use raw payload for stripe
+// eslint-disable-next-line @typescript-eslint/no-misused-promises
+app.post('/stripe', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
+  await handleWebHook(req, res, guilds, client)
+})
 
 client.once(Events.ClientReady, async () => {
   console.log('Ready!')
 
   // register commands
   await RegisterCommands(client)
-
-  if (!fs.existsSync(GUILD_DIRECTORY)) {
-    fs.mkdirSync(GUILD_DIRECTORY)
-  }
-
-  // iterate over all files in the channels directory and load them
-  const files = fs.readdirSync(GUILD_DIRECTORY)
-  for (const file of files) {
-    const filePath = `${GUILD_DIRECTORY}/${file}`
-    const fileContent = fs.readFileSync(filePath, 'utf-8')
-
-    const guild = await Guild.load(fileContent)
-    guilds.set(guild.id, guild)
-  }
 })
 
 // // register commands to the their handlers
@@ -65,6 +134,53 @@ const commands = new Map<
 string,
 (interaction: CommandInteraction) => Promise<void>
 >()
+commands.set('who', async (interaction) => {
+  // print the configuration options and print any system messages that are currently set
+  if (interaction.guildId == null) {
+    await interaction.reply({
+      content: 'This command can only be used in a server',
+      ephemeral: true
+    })
+    return
+  }
+  const guild = guilds.get(interaction.guildId)
+  if (guild == null) {
+    await interaction.reply({
+      content: 'This command can only be used in a server',
+      ephemeral: true
+    })
+    return
+  }
+
+  const channel = guild.channels.get(interaction.channelId)
+  if (channel == null) {
+    await interaction.reply({
+      content: 'This channel is not configured',
+      ephemeral: true
+    })
+    return
+  }
+
+  const messages =
+      channel.messages.filter(
+        (x) => x.chatCompletionRequestMessage.role === ChatCompletionResponseMessageRoleEnum.System)
+  const messageList = messages.map((m) => m.content).join('\n • ')
+
+  const response = 'Channel configured with the following settings: \n' +
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+    `\`ONLY_RESPOND_TO_MENTIONS\`: ${channel.config.ONLY_RESPOND_TO_MENTIONS}\n` +
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+    `\`IGNORE_BOTS\`: ${channel.config.IGNORE_BOTS}\n` +
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+    `\`IGNORE_EVERYONE_MENTIONS\`: ${channel.config.IGNORE_EVERYONE_MENTIONS}\n` +
+    `\`LANGUAGE_MODEL\`: ${channel.config.LANGUAGE_MODEL}` +
+    `\n\nSystem messages: \n • ${messageList}`
+
+  await interaction.reply({
+    content: response,
+    ephemeral: true
+  })
+})
 commands.set('config', async (interaction) => {
   if (interaction.guildId == null) {
     await interaction.reply({
@@ -108,16 +224,19 @@ commands.set('config', async (interaction) => {
       ...DEFAULT_GUILD_CONFIG,
       ...configPartial
     }
-    channel = new Channel(interaction.channelId, channelConfig)
+    channel = new Channel(
+      interaction.channelId,
+      interaction.guildId,
+      channelConfig
+    )
     guild.channels.set(interaction.channelId, channel)
-    await guild.save()
   } else {
     channel.config = {
       ...channel.config,
       ...configPartial
     }
-    await guild.save()
   }
+  await channel.save()
   await interaction.reply({
     content: 'Channel configured with the following settings: \n' +
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -150,9 +269,28 @@ commands.set('tokens', async (interaction) => {
   const gpt3Tokens = guild.gpt3TokensAvailable.toLocaleString()
   const gpt4Tokens = guild.gpt4TokensAvailable.toLocaleString()
 
+  const gpt3checkout = await generateCheckout(
+    interaction.guildId,
+    interaction.guild?.name ?? '',
+    interaction.user.id,
+    interaction.channelId,
+    TOKEN_TYPE.GPT_3
+  )
+
+  const gpt4checkout = await generateCheckout(
+    interaction.guildId,
+    interaction.guild?.name ?? '',
+    interaction.user.id,
+    interaction.channelId,
+    TOKEN_TYPE.GPT_4
+  )
+
   await interaction.reply({
-    content: `Tokens Remaining: \nGPT-3: ${gpt3Tokens}` +
-      `\nGPT-4: ${gpt4Tokens}`,
+    content: `Tokens Remaining: \n\`GPT-3: ${gpt3Tokens}\`` +
+      `\n\`GPT-4: ${gpt4Tokens}\`\n\nBuy more: [GPT-3](${gpt3checkout}) - ` +
+      `[GPT-4](${gpt4checkout})\n` +
+      'Note: GPT-4 is more powerful, but also more expensive.  Tokens are shared with the entire ' +
+      'server.',
     ephemeral: true
   })
 })
@@ -242,10 +380,11 @@ commands.set('system', async (interaction) => {
 
   if (list) {
     const messages =
-      channel.messages.filter((x) => x.role === ChatCompletionResponseMessageRoleEnum.System)
-    const messageList = messages.map((m) => m.content).join('\n')
+      channel.messages.filter(
+        (x) => x.chatCompletionRequestMessage.role === ChatCompletionResponseMessageRoleEnum.System)
+    const messageList = messages.map((m) => m.content).join('\n • ')
     await interaction.reply({
-      content: `System messages: \n${messageList}`
+      content: `System messages: \n • ${messageList}`
     })
     return
   }
@@ -261,9 +400,32 @@ commands.set('system', async (interaction) => {
     role: ChatCompletionResponseMessageRoleEnum.System,
     name: client.user?.id
   }
-  channel.addMessage(systemMessage)
+
+  const newMessage = new Message({
+    guildId: interaction.guildId,
+    channelId: interaction.channelId,
+    content: message,
+    timestamp: interaction.createdTimestamp,
+    type: ChatCompletionResponseMessageRoleEnum.System,
+    userId: client.user?.id ?? '',
+    chatCompletionRequestMessage: systemMessage
+  })
+
+  await channel.addMessage(newMessage)
   await interaction.reply({
     content: `System message added by <@${interaction.user.id}>: \n${message}`
+  })
+})
+
+commands.set('help', async (interaction) => {
+  await interaction.reply({
+    content: 'Commands: \n' +
+      '`/tokens `Check how many tokens this server has left and links to buy more \n' +
+      '`/config `Configure the bot for this channel (Admin only) \n' +
+      '`/reset  `Reset the bot for this channel (Admin only)\n' +
+      '`/system `Add a system message to the bot (Admin only) \n' +
+      '`/help   `Show this message',
+    ephemeral: true
   })
 })
 
@@ -299,23 +461,36 @@ client.on(Events.MessageCreate, async (message) => {
     console.log('Guild not found, creating new one')
     guild = new Guild(message.guildId, DEFAULT_GUILD_CONFIG)
     guilds.set(message.guildId, guild)
+    await guild.save()
   }
 
   const channel = await guild.getChannel(message.channelId)
 
   if (channel == null) {
-    await message.reply(
-      'This channel is not configured for chatting with me.  ' +
-      'Someone with permissions needs to run `/config` to configure this channel.')
+    if (message.mentions.users.has(client.user.id)) {
+      await message.reply(
+        'This channel is not configured for chatting with me.  ' +
+        'Someone with permissions needs to run `/config` to configure this channel.')
+    }
     return
   }
 
-  channel.addMessage({
-    role: ChatCompletionRequestMessageRoleEnum.User,
+  const newMessage = new Message({
+    id: message.id,
+    guildId: message.guildId,
+    channelId: message.channelId,
+    userId: message.author.id,
+    timestamp: message.createdTimestamp,
+    type: ChatCompletionRequestMessageRoleEnum.User,
     content: message.content,
-    name: message.author.id.toString()
+    chatCompletionRequestMessage: {
+      role: ChatCompletionRequestMessageRoleEnum.User,
+      content: message.content,
+      name: message.author.id.toString()
+    }
   })
-  await guild.save()
+
+  await channel.addMessage(newMessage)
 
   // also ignore @everyone or role mentions
   if (
@@ -376,7 +551,6 @@ client.on(Events.MessageCreate, async (message) => {
         .forEach((index) => {
           channel.messages.splice(index, 1)
         })
-      await guild.save()
       clearInterval(typingInterval)
       await message.reply(channel.config.MODERATION_VIOLATION)
       return
@@ -387,7 +561,7 @@ client.on(Events.MessageCreate, async (message) => {
     // subtract from the guild's token count
     if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
       try {
-        await guild.subtractGpt4Tokens(countTokens(channel.messages))
+        await guild.subtractGpt4Tokens(channel.countTotalTokens())
       } catch (error) {
         console.error(error)
         await message.reply('Sorry, you have run out of GPT-4 tokens')
@@ -396,7 +570,7 @@ client.on(Events.MessageCreate, async (message) => {
       }
     } else {
       try {
-        await guild.subtractGpt3Tokens(countTokens(channel.messages))
+        await guild.subtractGpt3Tokens(channel.countTotalTokens())
       } catch (error) {
         console.error(error)
         await message.reply('Sorry, you have run out of GPT-3 tokens')
@@ -406,7 +580,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     let response = await openAiHelper.createChatCompletion(
-      channel.messages ?? [],
+      channel.messages.map((message) => message.chatCompletionRequestMessage),
       channel.config.LANGUAGE_MODEL,
       message.author.id
     )
@@ -420,13 +594,21 @@ client.on(Events.MessageCreate, async (message) => {
       return
     }
 
-    channel.addMessage({
-      role: ChatCompletionRequestMessageRoleEnum.Assistant,
+    const newMessage = new Message({
+      guildId: message.guildId,
+      channelId: message.channelId,
+      userId: client.user.id,
+      timestamp: Date.now(),
+      type: ChatCompletionRequestMessageRoleEnum.Assistant,
       content: response,
-      name: client.user.id.toString()
+      chatCompletionRequestMessage: {
+        role: ChatCompletionRequestMessageRoleEnum.Assistant,
+        content: response,
+        name: client.user.id.toString()
+      }
     })
 
-    await guild.save()
+    await channel.addMessage(newMessage)
 
     console.log('Response: ' + response)
 
@@ -435,6 +617,7 @@ client.on(Events.MessageCreate, async (message) => {
       channel.setDisclaimerSent(true)
       response = channel.config.DISCLAIMER + '\n\n' + response
       console.log('Adding disclaimer')
+      await channel.save()
     }
 
     // if the message is too long, split it up into max of 2000
@@ -482,3 +665,9 @@ client
   .catch((e) => {
     console.error(e)
   })
+
+// add express endpoint to handle stripe payments
+
+app.listen(port, () => {
+  console.log(`Example app listening at http://localhost:${port}`)
+})
