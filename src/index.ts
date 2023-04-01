@@ -369,7 +369,9 @@ commands.set('tokens', async (interaction) => {
       `\n\`GPT-4: ${gpt4Tokens}\`\n\nBuy more: [GPT-3](${gpt3checkout}) - ` +
       `[GPT-4](${gpt4checkout})\n` +
       'Note: GPT-4 is more powerful, but also more expensive.  Tokens are shared with the entire ' +
-      'server.',
+      'server.\n\n' +
+      '[What\'s a token?]' +
+      '(https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them)',
     ephemeral: true
   })
 })
