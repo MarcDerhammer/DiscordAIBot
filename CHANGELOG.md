@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+-   Changed `/tokens` command to add the pricing page
+
 ## [3.0.11] - 2023-04-02
 
 -   Log to mongo as well as console for easier parsing of logs
