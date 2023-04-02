@@ -4,13 +4,13 @@ import { type Request, type Response } from 'express'
 import { type Client, TextChannel } from 'discord.js'
 
 const GPT_3_PRICE_PER_TOKEN = 0.003 / 1000
-const GPT_4_PRICE_PER_TOKEN = 0.05 / 1000
+const GPT_4_PRICE_PER_TOKEN = 0.035 / 1000
 
 const GPT_3_UNIT_AMOUNT = 1000000
-const GPT_4_UNIT_AMOUNT = 50000
+const GPT_4_UNIT_AMOUNT = 100000
 
-const GPT_3_PRICE_PER_UNIT = GPT_3_PRICE_PER_TOKEN * GPT_3_UNIT_AMOUNT * 100
-const GPT_4_PRICE_PER_UNIT = GPT_4_PRICE_PER_TOKEN * GPT_4_UNIT_AMOUNT * 100
+const GPT_3_PRICE_PER_UNIT = Math.round(GPT_3_PRICE_PER_TOKEN * GPT_3_UNIT_AMOUNT * 100)
+const GPT_4_PRICE_PER_UNIT = Math.round(GPT_4_PRICE_PER_TOKEN * GPT_4_UNIT_AMOUNT * 100)
 
 const GPT_3_MESSAGE = 'Tokens are used to generate messages. ' +
 'Using OpenAI\'s GPT-3.5-Turbo model, ' +

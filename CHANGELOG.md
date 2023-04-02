@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.10] - 2023-04-02
+
+-   Lowered price of GPT-4 Tokens
+
 ## [3.0.9] - 2023-04-01
+
+### Added
+
+-   ntfy.sh support
+
+### Fixed
+
+-   Bug with when a server didn't give the bot proper permissions was crashing the server
 
 ## [3.0.8] - 2023-04-01
 
@@ -75,7 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.9...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.10...HEAD
+
+[3.0.10]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.9...3.0.10
 
 [3.0.9]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.8...3.0.9
 
