@@ -11,7 +11,7 @@ import {
 } from 'discord.js'
 import { getEnv } from './env'
 
-import { OpenAiHelper } from './OpenAiHelper'
+import { countTokens, OpenAiHelper } from './OpenAiHelper'
 import { DEFAULT_GUILD_CONFIG, Guild } from './messages/Guild'
 import { type ChannelConfig } from './messages/ChannelConfig'
 import { Channel } from './messages/Channel'
@@ -22,6 +22,7 @@ import bodyParser from 'body-parser'
 import { Message } from './messages/Message'
 import { mongoClient } from './mongo/MongoClient'
 import { Ntfy } from './ntfy/Ntfy'
+import { log } from './logger'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
@@ -171,37 +172,60 @@ app.post('/admin', async (req, res) => {
 
     if (gpt4Tokens != null) {
       guild.gpt4TokensAvailable += gpt4Tokens as number
-      console.log(`Added ${gpt4Tokens as string} to ${guildId as string}`)
+      log({
+        guildId: guildId as string,
+        message: `/admin POST added ${gpt4Tokens as string} GPT-4 Tokens ${guildId as string}`,
+        channelId: channelId as string
+      })
       await guild.save()
     }
 
     if (gpt3Tokens != null) {
       guild.gpt3TokensAvailable += gpt3Tokens as number
-      console.log(`Added ${gpt3Tokens as string} to ${guildId as string}`)
+      log({
+        guildId: guildId as string,
+        message: `/admin POST added ${gpt3Tokens as string} GPT-3 Tokens ${guildId as string}`,
+        channelId: channelId as string
+      })
       await guild.save()
     }
 
     if (channelId != null) {
       if (message != null) {
-        console.log('Looking up channel...')
         const channel = await client.channels.fetch(channelId)
         const messagePrefix = '`[Message from Developer]`\n'
         if (channel instanceof TextChannel) {
           await channel.send(messagePrefix + (message as string))
+          log({
+            guildId: guildId as string,
+            message: `${messagePrefix} ${message as string}`,
+            channelId: channelId as string
+          })
         } else {
-          console.log('Channel not found')
+          log({
+            guildId: guildId as string,
+            message: `Unable to send message to channel ${channelId as string}`,
+            channelId: channelId as string,
+            level: 'error'
+          })
         }
       }
     }
     res.send('ok')
   } catch (e) {
-    console.log(e)
+    log({
+      message: e,
+      level: 'error'
+    })
     res.status(500).send('Internal Server Error')
   }
 })
 
 client.once(Events.ClientReady, async () => {
-  console.log('Ready!')
+  log({
+    message: 'Bot is ready ready!',
+    level: 'info'
+  })
 
   // register commands
   await RegisterCommands(client)
@@ -282,8 +306,11 @@ commands.set('config', async (interaction) => {
     LANGUAGE_MODEL: languageModel
   }
 
-  console.log('Configuring channel: ' + interaction.channelId)
-  console.log('Config: ' + JSON.stringify(configPartial))
+  log({
+    guildId: interaction.guildId,
+    message: `Configuring channel ${interaction.channelId} with ${JSON.stringify(configPartial)}`,
+    channelId: interaction.channelId
+  })
 
   // get the guild
   let guild = guilds.get(interaction.guildId)
@@ -329,7 +356,11 @@ commands.set('config', async (interaction) => {
 })
 
 commands.set('tokens', async (interaction) => {
-  console.log('Tokens command from ' + interaction.user.id)
+  log({
+    guildId: interaction.guildId ?? undefined,
+    message: `Tokens command from ${interaction.user.id}`,
+    channelId: interaction.channelId
+  })
   if (interaction.guildId == null) {
     await interaction.reply({
       content: 'This command can only be used in a server',
@@ -388,7 +419,7 @@ commands.set('reset', async (interaction) => {
   const guild = guilds.get(interaction.guildId)
   if (guild == null) {
     await interaction.reply({
-      content: 'This server does not have any configuration',
+      content: 'This server does not have any configuration. Use `/config` to set it up.',
       ephemeral: true
     })
     return
@@ -396,7 +427,7 @@ commands.set('reset', async (interaction) => {
   const channel = guild.channels.get(interaction.channelId)
   if (channel == null) {
     await interaction.reply({
-      content: 'This channel does not have any configuration',
+      content: 'This channel does not have any configuration. Use `/config` to set it up.',
       ephemeral: true
     })
     return
@@ -425,7 +456,11 @@ commands.set('reset', async (interaction) => {
   if (type === 'system') {
     channel.removeMessagesByType(ChatCompletionResponseMessageRoleEnum.System)
   }
-  console.log(`${guild.id}:${channel.id}: ${interaction.user.id} Cleared ${type} messages`)
+  log({
+    guildId: interaction.guildId,
+    channelId: interaction.channelId,
+    message: `${interaction.user.id} Cleared ${type} messages`
+  })
   await interaction.reply({
     content: `${type.toUpperCase()} messages have been cleared by <@${interaction.user.id}>`
   })
@@ -495,8 +530,11 @@ commands.set('system', async (interaction) => {
   })
 
   await channel.addMessage(newMessage)
-  const LOG_PREFIX = `${interaction.guildId}:${interaction.channelId}:`
-  console.log(LOG_PREFIX, `System message added by ${interaction.user.id} ${message}`)
+  log({
+    guildId: interaction.guildId,
+    channelId: interaction.channelId,
+    message: `${interaction.user.id} Added system message: ${message}`
+  })
   await interaction.reply({
     content: `System message added by <@${interaction.user.id}>: \n${message}`
   })
@@ -518,14 +556,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isCommand()) {
     // register handlers in the commands
     const command = commands.get(interaction.commandName)
-    if (command == null) {
-      console.log('Command not found: ' + interaction.commandName)
-      return
-    }
+    if (command == null) return
     try {
       await command(interaction)
     } catch (error) {
-      console.error(error)
+      log({
+        guildId: interaction.guildId ?? undefined,
+        channelId: interaction.channelId,
+        message: `Error processing command ${interaction.commandName}: ${error as string}`
+      })
       await interaction.reply({
         content: 'An error occurred while processing this command',
         ephemeral: true
@@ -540,12 +579,19 @@ client.on(Events.MessageCreate, async (message) => {
     if (client.user?.id == null || message.channelId == null) return
     if (message.author.id === client.user.id) return
 
-    console.log(`${message.guildId}:${message.channelId ?? '<>'}:` +
-    `${message.author.username}: ${message.content}`)
+    log({
+      guildId: message.guildId,
+      channelId: message.channelId,
+      message: `${message.author.username}: ${message.content}`
+    })
 
     let guild = guilds.get(message.guildId)
     if (guild == null) {
-      console.log('Guild not found, creating new one')
+      log({
+        guildId: message.guildId,
+        channelId: message.channelId,
+        message: 'Guild not found, creating new one'
+      })
       guild = new Guild(message.guildId, DEFAULT_GUILD_CONFIG)
       guilds.set(message.guildId, guild)
       await guild.save()
@@ -558,8 +604,11 @@ client.on(Events.MessageCreate, async (message) => {
 
     if (channel == null) {
       if (message.mentions.users.has(client.user.id)) {
-        console.error(LOG_PREFIX +
-            'Channel not found, but mentioned, replying with /config message')
+        log({
+          guildId: message.guildId,
+          channelId: message.channelId,
+          message: 'Channel not found, but mentioned, replying with /config message'
+        })
         await message.reply(
           'This channel is not configured for chatting with me.  ' +
         'Someone with permissions needs to run `/config` to configure this channel.')
@@ -585,33 +634,22 @@ client.on(Events.MessageCreate, async (message) => {
     await channel.addMessage(newMessage)
 
     // also ignore @everyone or role mentions
-    if (
-      (message.mentions.everyone || message.mentions.roles.size > 0) &&
-    channel.config.IGNORE_EVERYONE_MENTIONS
-    ) {
-      console.log(LOG_PREFIX + 'Ignoring @everyone or role mention')
-      return
-    }
+    if ((message.mentions.everyone || message.mentions.roles.size > 0) &&
+      channel.config.IGNORE_EVERYONE_MENTIONS) return
 
     // also ignore all bots.. we don't want to get into a loop
-    if (message.author.bot && channel.config.IGNORE_BOTS) {
-      console.log(LOG_PREFIX + 'Ignoring bot message')
-      return
-    }
-
-    console.log('Existing messages: ' + channel.messages.length.toString())
-
-    if (
-      !message.mentions.has(client.user) &&
-    channel.config.ONLY_RESPOND_TO_MENTIONS
-    ) {
-      console.log(LOG_PREFIX + 'Message does not mention bot, ignoring')
+    if (message.author.bot && channel.config.IGNORE_BOTS) return
+    if (!message.mentions.has(client.user) && channel.config.ONLY_RESPOND_TO_MENTIONS) {
       return
     }
 
     // if there were mentions that don't include us, ignore
     if (message.mentions.users.size > 0 && !message.mentions.has(client.user)) {
-      console.log(LOG_PREFIX + 'Message mentions other users, ignoring')
+      log({
+        guildId: message.guildId,
+        channelId: message.channelId,
+        message: 'Message has mentions, but not us, ignoring'
+      })
       return
     }
 
@@ -621,16 +659,23 @@ client.on(Events.MessageCreate, async (message) => {
       message.channel
         .sendTyping()
         .then(() => {
-          console.log(LOG_PREFIX + 'Sent typing...')
+          log({
+            guildId: message.guildId ?? undefined,
+            channelId: message.channelId,
+            message: 'Sent typing...'
+          })
         })
         .catch(() => {
-          console.error('Error sending typing')
+          log({
+            guildId: message.guildId ?? undefined,
+            channelId: message.channelId,
+            message: 'Error sending typing',
+            level: 'error'
+          })
         })
     }, 5000)
 
     try {
-      console.log(LOG_PREFIX + 'Checking moderation...')
-
       // ensure the message is appropriate
       const badIndices = await openAiHelper.findModerationIndices(
         channel.messages.map((message) => message.content)
@@ -645,13 +690,22 @@ client.on(Events.MessageCreate, async (message) => {
           })
         clearInterval(typingInterval)
         await message.reply(channel.config.MODERATION_VIOLATION)
+        log({
+          guildId: message.guildId,
+          channelId: message.channelId,
+          message: 'Moderation violation! Ignoring message'
+        })
         return
       }
 
       // lastly ensure the guild is at least one week old to prevent abuse
       if (((message.guild?.createdTimestamp) == null) ||
         message.guild.createdTimestamp > Date.now() - 1000 * 60 * 60 * 24 * 7) {
-        console.log(LOG_PREFIX + 'Guild is too new, ignoring')
+        log({
+          guildId: message.guildId,
+          channelId: message.channelId,
+          message: 'Server is less than one week old, ignoring message'
+        })
         await message.reply('Sorry. To prevent abuse, your server must be at ' +
           'least one week old to use this bot')
         clearInterval(typingInterval)
@@ -660,7 +714,11 @@ client.on(Events.MessageCreate, async (message) => {
 
       if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
         if (guild.gpt4TokensAvailable <= 0) {
-          console.log(LOG_PREFIX + 'No tokens available for GPT-4')
+          log({
+            guildId: message.guildId,
+            channelId: message.channelId,
+            message: 'No tokens available for GPT-4'
+          })
           await message.reply('Sorry, you have run out of GPT-4 tokens. `/tokens` to get more or ' +
         '`/config` to switch to GPT-3')
           clearInterval(typingInterval)
@@ -670,7 +728,11 @@ client.on(Events.MessageCreate, async (message) => {
         }
       } else {
         if (guild.gpt3TokensAvailable <= 0) {
-          console.log(LOG_PREFIX + 'No tokens available for GPT-3')
+          log({
+            guildId: message.guildId,
+            channelId: message.channelId,
+            message: 'No tokens available for GPT-3'
+          })
           await message.reply('Sorry, you have run out of GPT-3 tokens. `/tokens` to get more')
           guild.gpt3TokensAvailable = 0
           clearInterval(typingInterval)
@@ -679,7 +741,11 @@ client.on(Events.MessageCreate, async (message) => {
         }
       }
 
-      console.log(LOG_PREFIX + 'Generating response...')
+      log({
+        guildId: message.guildId,
+        channelId: message.channelId,
+        message: `Creating completion with prompt tokens: ${channel.countTotalTokens()}`
+      })
 
       let response = await openAiHelper.createChatCompletion(
         channel.messages.map((message) => message.chatCompletionRequestMessage),
@@ -692,14 +758,24 @@ client.on(Events.MessageCreate, async (message) => {
         try {
           await guild.subtractGpt4Tokens(channel.countTotalTokens())
         } catch (error) {
-          console.error(error)
+          log({
+            guildId: message.guildId,
+            channelId: message.channelId,
+            message: 'Error subtracting tokens' + (error as string),
+            level: 'error'
+          })
           return
         }
       } else {
         try {
           await guild.subtractGpt3Tokens(channel.countTotalTokens())
         } catch (error) {
-          console.error(error)
+          log({
+            guildId: message.guildId,
+            channelId: message.channelId,
+            message: 'Error subtracting tokens' + (error as string),
+            level: 'error'
+          })
           return
         }
       }
@@ -707,7 +783,11 @@ client.on(Events.MessageCreate, async (message) => {
       // let's ensure our own response doesn't violate any moderation
       // rules
       if ((await openAiHelper.findModerationIndices([response])).length > 0) {
-        console.log(LOG_PREFIX + 'Response flagged: ' + response)
+        log({
+          guildId: message.guildId,
+          channelId: message.channelId,
+          message: 'Moderation violation (from our own response...)'
+        })
         clearInterval(typingInterval)
         await message.reply(channel.config.MODERATION_VIOLATION)
         return
@@ -729,13 +809,21 @@ client.on(Events.MessageCreate, async (message) => {
 
       await channel.addMessage(newMessage)
 
-      console.log(LOG_PREFIX + 'Response: ' + response)
+      log({
+        guildId: message.guildId,
+        channelId: message.channelId,
+        message: 'AI Response: ' + response
+      })
 
       // if this is the first assistant message, send the disclaimer first
       if (!channel.disclaimerSent && channel.config.DISCLAIMER.length > 0) {
         channel.setDisclaimerSent(true)
         response = channel.config.DISCLAIMER + '\n\n' + response
-        console.log(LOG_PREFIX + 'Adding disclaimer')
+        log({
+          guildId: message.guildId,
+          channelId: message.channelId,
+          message: 'Adding Disclaimer to message'
+        })
         await channel.save()
       }
 
@@ -755,13 +843,23 @@ client.on(Events.MessageCreate, async (message) => {
         }
       }
     } catch (e) {
-      console.log(e)
+      log({
+        guildId: message.guildId,
+        channelId: message.channelId,
+        message: 'Error: ' + (e as string),
+        level: 'error'
+      })
       await message.reply(channel.config.ERROR_RESPONSE)
     } finally {
       clearInterval(typingInterval)
     }
   } catch (e) {
-    console.error(e)
+    log({
+      guildId: message.guildId ?? undefined,
+      channelId: message.channelId,
+      message: 'Error: ' + (e as string),
+      level: 'error'
+    })
   }
 })
 
@@ -774,23 +872,23 @@ setInterval(() => {
 client
   .login(DISCORD_TOKEN)
   .then(async () => {
-    console.log(NTFY_TOPIC)
-    console.log('Sending notification to ntfy.sh')
-    await ntfy.publish('The server has started', 'Discord AI Bot Started', 'robot')
-    console.log('Logged in!')
-    // print how many servers we're in
-    console.log(
-      `Connected to ${client.guilds.cache.size} ` +
-      'server(s)'
-    )
+    await ntfy.publish('Discord AI Bot Started', 'The server has started', 'robot')
+    log({
+      message: `Connected to ${client.guilds.cache.size} `
+    })
   })
   .catch((e) => {
-    console.error(e)
+    log({
+      message: 'Error: ' + (e as string),
+      level: 'error'
+    })
     void ntfy.publish('The server has failed to start', 'Discord AI Bot Failed to Start', 'robot')
   })
 
 // add express endpoint to handle stripe payments
 
 app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`)
+  log({
+    message: `Express listening at http://localhost:${port}`
+  })
 })

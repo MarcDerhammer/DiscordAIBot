@@ -4,6 +4,7 @@ import { type ChannelConfig } from './ChannelConfig'
 import fs from 'fs'
 import { DEFAULT_MODERATION_VIOATION_RESPONSE, DISCLAIMER } from '../env'
 import { mongoClient } from '../mongo/MongoClient'
+import { log } from '../logger'
 
 export const DEFAULT_GUILD_CONFIG: ChannelConfig = {
   ERROR_RESPONSE: 'Sorry, there was an error. Please try again later.',
@@ -48,7 +49,11 @@ export class Guild {
 
   async getChannel (id: string): Promise<Channel | undefined> {
     if (!this.channels.has(id)) {
-      console.error('Channel not found')
+      log({
+        guildId: this.id,
+        channelId: id,
+        message: 'Channel not found'
+      })
       return undefined
     }
     return this.channels.get(id)
@@ -61,7 +66,6 @@ export class Guild {
       throw new Error('Ran out of GPT-3 tokens')
     }
     this.gpt3TokensAvailable -= tokens
-    console.log('GPT-3 tokens remaining: ' + this.gpt3TokensAvailable.toString())
     await this.save()
   }
 
@@ -72,7 +76,6 @@ export class Guild {
       throw new Error('Ran out of GPT-4 tokens')
     }
     this.gpt4TokensAvailable -= tokens
-    console.log('GPT-4 tokens remaining: ' + this.gpt4TokensAvailable.toString())
     await this.save()
   }
 

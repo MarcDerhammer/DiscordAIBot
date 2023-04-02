@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+import { log } from './logger'
 dotenv.config()
 
 export const DEFAULT_ERROR_RESPONSE =
@@ -7,7 +8,8 @@ export const DEFAULT_MODERATION_VIOATION_RESPONSE =
   'Some content in this chat\'s history was detected violating Open AI\'s usage policies. ' +
   'The offending messages have been cleared from my memory.'
 export const DISCLAIMER = 'This bot uses Open AI\'s GPT API to generate messages.  ' +
-  'Any person or character it may be imitating is a simulation.'
+  'Any person or character it may be imitating is a simulation. ' +
+  'Use `/system` to add system messages to the conversation.'
 
 type EnvConfig = Record<string, string | undefined>
 
@@ -41,7 +43,10 @@ function isRequiredEnv (key: keyof Env): key is keyof RequiredEnv {
 export function getEnv (key: keyof Env): string {
   const value = env[key]
   if (isRequiredEnv(key) && value === undefined) {
-    console.error(`Please set the ${key} environment variable.`)
+    log({
+      level: 'error',
+      message: `Please set the ${key} environment variable.`
+    })
     process.exit(1)
   }
   return value ?? ''

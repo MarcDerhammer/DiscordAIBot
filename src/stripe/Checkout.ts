@@ -2,6 +2,7 @@ import Stripe from 'stripe'
 import { type Guild } from '../messages/Guild'
 import { type Request, type Response } from 'express'
 import { type Client, TextChannel } from 'discord.js'
+import { log } from '../logger'
 
 const GPT_3_PRICE_PER_TOKEN = 0.003 / 1000
 const GPT_4_PRICE_PER_TOKEN = 0.035 / 1000
@@ -80,7 +81,11 @@ export async function handleWebHook (
       const guildId = session.metadata?.discord_id as string
       const guild = guilds.get(guildId)
       if (guild === undefined) {
-        console.error('Guild not found: ' + guildId)
+        log({
+          level: 'error',
+          message: 'Error in Stripe webhook: Guild not found: ' + guildId,
+          guildId
+        })
         throw new Error('Guild not found')
       }
 
@@ -136,7 +141,10 @@ export async function handleWebHook (
   } catch (err) {
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     res.status(500).send(`Webhook Error: ${err.message}`)
-    console.error(err)
+    log({
+      level: 'error',
+      message: 'Error in Stripe webhook: ' + (err.message as string)
+    })
   }
 }
 

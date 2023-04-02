@@ -24,13 +24,6 @@ export class OpenAiHelper {
       )
     }
 
-    // print the violating messages to console
-    moderation.data.results.forEach((result, index) => {
-      if (result.flagged) {
-        console.log('Message "' + messages[index] + '" is flagged')
-      }
-    })
-
     // find the indices of the messages that are inappropriate
     const flaggedIndices = moderation.data.results
       .map((result, index) => {
@@ -54,8 +47,6 @@ export class OpenAiHelper {
     if (MAX_TOKEN_COUNT <= 0) {
       throw new Error('Max tokens is less than or equal to 0')
     }
-
-    console.log('Max tokens: ' + MAX_TOKEN_COUNT.toString())
 
     const response = await this.openai.createChatCompletion({
       model: languageModel,
