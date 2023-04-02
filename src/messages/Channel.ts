@@ -1,6 +1,7 @@
 import {
   ChatCompletionRequestMessageRoleEnum
 } from 'openai'
+import { log } from '../logger'
 import { mongoClient } from '../mongo/MongoClient'
 import { countTokens } from '../OpenAiHelper'
 import { type ChannelConfig } from './ChannelConfig'
@@ -50,7 +51,11 @@ export class Channel {
       (this.config.LANGUAGE_MODEL === 'gpt-3.5-turbo'
         ? GPT_3_LIMIT
         : GPT_4_LIMIT)) {
-      console.log('Removing message to avoid exceeding max token count')
+      log({
+        guildId: this.guildId,
+        channelId: this.id,
+        message: 'Removing message to avoid exceeding max token count'
+      })
       // remove the first non-system message
       const index = this.messages.findIndex(
         (message) =>
@@ -66,7 +71,11 @@ export class Channel {
   }
 
   clearMessages (): void {
-    console.log('Clearing conversation for channel: ' + this.id)
+    log({
+      guildId: this.guildId,
+      channelId: this.id,
+      message: 'Clearing ALL messages'
+    })
     // await all of these to run in parallel
     this.removeMessagesByType(ChatCompletionRequestMessageRoleEnum.User)
     this.removeMessagesByType(ChatCompletionRequestMessageRoleEnum.Assistant)
@@ -76,6 +85,11 @@ export class Channel {
   removeMessagesByType (
     role: ChatCompletionRequestMessageRoleEnum
   ): void {
+    log({
+      guildId: this.guildId,
+      channelId: this.id,
+      message: `Clearing messages of type ${role}`
+    })
     this.messages = [
       ...this.messages.filter((message) => message.chatCompletionRequestMessage.role !== role)
     ]
