@@ -21,10 +21,14 @@ import express from 'express'
 import bodyParser from 'body-parser'
 import { Message } from './messages/Message'
 import { mongoClient } from './mongo/MongoClient'
+import { Ntfy } from './ntfy/Ntfy'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
 const ADMIN_API_KEY = getEnv('ADMIN_API_KEY')
+const NTFY_TOPIC = getEnv('NTFY_TOPIC')
+
+export const ntfy = new Ntfy(NTFY_TOPIC)
 
 const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
@@ -120,6 +124,7 @@ app.use((req, res, next) => {
 // use raw payload for stripe
 // eslint-disable-next-line @typescript-eslint/no-misused-promises
 app.post('/stripe', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
+  void ntfy.publish('Stripe Payment Received', 'A payment was received!!', 'moneybag')
   await handleWebHook(req, res, guilds, client)
 })
 
@@ -287,6 +292,7 @@ commands.set('config', async (interaction) => {
   if (guild == null) {
     guild = new Guild(interaction.guildId, DEFAULT_GUILD_CONFIG)
     guilds.set(interaction.guildId, guild)
+    void ntfy.publish('New Server', 'A new server has been added to the bot', 'partying_face')
   }
 
   // get the channel config
@@ -364,7 +370,9 @@ commands.set('tokens', async (interaction) => {
       `\n\`GPT-4: ${gpt4Tokens}\`\n\nBuy more: [GPT-3](${gpt3checkout}) - ` +
       `[GPT-4](${gpt4checkout})\n` +
       'Note: GPT-4 is more powerful, but also more expensive.  Tokens are shared with the entire ' +
-      'server.',
+      'server.\n\n' +
+      '[What\'s a token?]' +
+      '(https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them)',
     ephemeral: true
   })
 })
@@ -527,227 +535,233 @@ client.on(Events.InteractionCreate, async (interaction) => {
 })
 
 client.on(Events.MessageCreate, async (message) => {
-  if (message.guildId == null) return
-  if (client.user?.id == null || message.channelId == null) return
-  if (message.author.id === client.user.id) return
+  try {
+    if (message.guildId == null) return
+    if (client.user?.id == null || message.channelId == null) return
+    if (message.author.id === client.user.id) return
 
-  console.log(`${message.guildId}:${message.channelId ?? '<>'}:` +
+    console.log(`${message.guildId}:${message.channelId ?? '<>'}:` +
     `${message.author.username}: ${message.content}`)
 
-  let guild = guilds.get(message.guildId)
-  if (guild == null) {
-    console.log('Guild not found, creating new one')
-    guild = new Guild(message.guildId, DEFAULT_GUILD_CONFIG)
-    guilds.set(message.guildId, guild)
-    await guild.save()
-  }
+    let guild = guilds.get(message.guildId)
+    if (guild == null) {
+      console.log('Guild not found, creating new one')
+      guild = new Guild(message.guildId, DEFAULT_GUILD_CONFIG)
+      guilds.set(message.guildId, guild)
+      await guild.save()
+      void ntfy.publish('New Server', 'A new server has been added to the bot', 'partying_face')
+    }
 
-  const channel = await guild.getChannel(message.channelId)
+    const channel = await guild.getChannel(message.channelId)
 
-  const LOG_PREFIX = `${message.guildId}:${message.channelId}:`
+    const LOG_PREFIX = `${message.guildId}:${message.channelId}:`
 
-  if (channel == null) {
-    if (message.mentions.users.has(client.user.id)) {
-      console.error(LOG_PREFIX + 'Channel not found, but mentioned, replying with /config message')
-      await message.reply(
-        'This channel is not configured for chatting with me.  ' +
+    if (channel == null) {
+      if (message.mentions.users.has(client.user.id)) {
+        console.error(LOG_PREFIX +
+            'Channel not found, but mentioned, replying with /config message')
+        await message.reply(
+          'This channel is not configured for chatting with me.  ' +
         'Someone with permissions needs to run `/config` to configure this channel.')
-    }
-    return
-  }
-
-  const newMessage = new Message({
-    id: message.id,
-    guildId: message.guildId,
-    channelId: message.channelId,
-    userId: message.author.id,
-    timestamp: message.createdTimestamp,
-    type: ChatCompletionRequestMessageRoleEnum.User,
-    content: message.content,
-    chatCompletionRequestMessage: {
-      role: ChatCompletionRequestMessageRoleEnum.User,
-      content: message.content,
-      name: message.author.id.toString()
-    }
-  })
-
-  await channel.addMessage(newMessage)
-
-  // also ignore @everyone or role mentions
-  if (
-    (message.mentions.everyone || message.mentions.roles.size > 0) &&
-    channel.config.IGNORE_EVERYONE_MENTIONS
-  ) {
-    console.log(LOG_PREFIX + 'Ignoring @everyone or role mention')
-    return
-  }
-
-  // also ignore all bots.. we don't want to get into a loop
-  if (message.author.bot && channel.config.IGNORE_BOTS) {
-    console.log(LOG_PREFIX + 'Ignoring bot message')
-    return
-  }
-
-  console.log('Existing messages: ' + channel.messages.length.toString())
-
-  if (
-    !message.mentions.has(client.user) &&
-    channel.config.ONLY_RESPOND_TO_MENTIONS
-  ) {
-    console.log(LOG_PREFIX + 'Message does not mention bot, ignoring')
-    return
-  }
-
-  // if there were mentions that don't include us, ignore
-  if (message.mentions.users.size > 0 && !message.mentions.has(client.user)) {
-    console.log(LOG_PREFIX + 'Message mentions other users, ignoring')
-    return
-  }
-
-  await message.channel.sendTyping()
-  // continulously send typing while waiting for the completion
-  const typingInterval = setInterval(() => {
-    message.channel
-      .sendTyping()
-      .then(() => {
-        console.log(LOG_PREFIX + 'Sent typing...')
-      })
-      .catch(() => {
-        console.error('Error sending typing')
-      })
-  }, 5000)
-
-  try {
-    console.log(LOG_PREFIX + 'Checking moderation...')
-
-    // ensure the message is appropriate
-    const badIndices = await openAiHelper.findModerationIndices(
-      channel.messages.map((message) => message.content)
-    )
-
-    if (badIndices.length > 0) {
-      // remove any messages that were flagged
-      badIndices
-        .sort((a, b) => b - a)
-        .forEach((index) => {
-          channel.messages.splice(index, 1)
-        })
-      clearInterval(typingInterval)
-      await message.reply(channel.config.MODERATION_VIOLATION)
-      return
-    }
-
-    // lastly ensure the guild is at least one week old to prevent abuse
-    if (((message.guild?.createdTimestamp) == null) ||
-        message.guild.createdTimestamp > Date.now() - 1000 * 60 * 60 * 24 * 7) {
-      console.log(LOG_PREFIX + 'Guild is too new, ignoring')
-      await message.reply('Sorry. To prevent abuse, your server must be at ' +
-          'least one week old to use this bot')
-      clearInterval(typingInterval)
-      return
-    }
-
-    if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
-      if (guild.gpt4TokensAvailable <= 0) {
-        console.log(LOG_PREFIX + 'No tokens available for GPT-4')
-        await message.reply('Sorry, you have run out of GPT-4 tokens. `/tokens` to get more or ' +
-        '`/config` to switch to GPT-3')
-        clearInterval(typingInterval)
-        guild.gpt4TokensAvailable = 0
-        await guild.save()
-        return
       }
-    } else {
-      if (guild.gpt3TokensAvailable <= 0) {
-        console.log(LOG_PREFIX + 'No tokens available for GPT-3')
-        await message.reply('Sorry, you have run out of GPT-3 tokens. `/tokens` to get more')
-        guild.gpt3TokensAvailable = 0
-        clearInterval(typingInterval)
-        await guild.save()
-        return
-      }
-    }
-
-    console.log(LOG_PREFIX + 'Generating response...')
-
-    let response = await openAiHelper.createChatCompletion(
-      channel.messages.map((message) => message.chatCompletionRequestMessage),
-      channel.config.LANGUAGE_MODEL,
-      message.author.id
-    )
-
-    // subtract from the guild's token count
-    if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
-      try {
-        await guild.subtractGpt4Tokens(channel.countTotalTokens())
-      } catch (error) {
-        console.error(error)
-        return
-      }
-    } else {
-      try {
-        await guild.subtractGpt3Tokens(channel.countTotalTokens())
-      } catch (error) {
-        console.error(error)
-        return
-      }
-    }
-
-    // let's ensure our own response doesn't violate any moderation
-    // rules
-    if ((await openAiHelper.findModerationIndices([response])).length > 0) {
-      console.log(LOG_PREFIX + 'Response flagged: ' + response)
-      clearInterval(typingInterval)
-      await message.reply(channel.config.MODERATION_VIOLATION)
       return
     }
 
     const newMessage = new Message({
+      id: message.id,
       guildId: message.guildId,
       channelId: message.channelId,
-      userId: client.user.id,
-      timestamp: Date.now(),
-      type: ChatCompletionRequestMessageRoleEnum.Assistant,
-      content: response,
+      userId: message.author.id,
+      timestamp: message.createdTimestamp,
+      type: ChatCompletionRequestMessageRoleEnum.User,
+      content: message.content,
       chatCompletionRequestMessage: {
-        role: ChatCompletionRequestMessageRoleEnum.Assistant,
-        content: response,
-        name: client.user.id.toString()
+        role: ChatCompletionRequestMessageRoleEnum.User,
+        content: message.content,
+        name: message.author.id.toString()
       }
     })
 
     await channel.addMessage(newMessage)
 
-    console.log(LOG_PREFIX + 'Response: ' + response)
-
-    // if this is the first assistant message, send the disclaimer first
-    if (!channel.disclaimerSent && channel.config.DISCLAIMER.length > 0) {
-      channel.setDisclaimerSent(true)
-      response = channel.config.DISCLAIMER + '\n\n' + response
-      console.log(LOG_PREFIX + 'Adding disclaimer')
-      await channel.save()
+    // also ignore @everyone or role mentions
+    if (
+      (message.mentions.everyone || message.mentions.roles.size > 0) &&
+    channel.config.IGNORE_EVERYONE_MENTIONS
+    ) {
+      console.log(LOG_PREFIX + 'Ignoring @everyone or role mention')
+      return
     }
 
-    // if the message is too long, split it up into max of 2000
-    // characters per message
-    // split up the messsage into each 2000 character chunks
-    const chunks = response.match(/[\s\S]{1,2000}/g)
-    clearInterval(typingInterval)
-    for (const chunk of chunks ?? []) {
-      // if it was a mention, reply to the message
-      if (message.mentions.has(client.user)) {
-        await message.reply(chunk)
+    // also ignore all bots.. we don't want to get into a loop
+    if (message.author.bot && channel.config.IGNORE_BOTS) {
+      console.log(LOG_PREFIX + 'Ignoring bot message')
+      return
+    }
+
+    console.log('Existing messages: ' + channel.messages.length.toString())
+
+    if (
+      !message.mentions.has(client.user) &&
+    channel.config.ONLY_RESPOND_TO_MENTIONS
+    ) {
+      console.log(LOG_PREFIX + 'Message does not mention bot, ignoring')
+      return
+    }
+
+    // if there were mentions that don't include us, ignore
+    if (message.mentions.users.size > 0 && !message.mentions.has(client.user)) {
+      console.log(LOG_PREFIX + 'Message mentions other users, ignoring')
+      return
+    }
+
+    await message.channel.sendTyping()
+    // continulously send typing while waiting for the completion
+    const typingInterval = setInterval(() => {
+      message.channel
+        .sendTyping()
+        .then(() => {
+          console.log(LOG_PREFIX + 'Sent typing...')
+        })
+        .catch(() => {
+          console.error('Error sending typing')
+        })
+    }, 5000)
+
+    try {
+      console.log(LOG_PREFIX + 'Checking moderation...')
+
+      // ensure the message is appropriate
+      const badIndices = await openAiHelper.findModerationIndices(
+        channel.messages.map((message) => message.content)
+      )
+
+      if (badIndices.length > 0) {
+      // remove any messages that were flagged
+        badIndices
+          .sort((a, b) => b - a)
+          .forEach((index) => {
+            channel.messages.splice(index, 1)
+          })
+        clearInterval(typingInterval)
+        await message.reply(channel.config.MODERATION_VIOLATION)
+        return
+      }
+
+      // lastly ensure the guild is at least one week old to prevent abuse
+      if (((message.guild?.createdTimestamp) == null) ||
+        message.guild.createdTimestamp > Date.now() - 1000 * 60 * 60 * 24 * 7) {
+        console.log(LOG_PREFIX + 'Guild is too new, ignoring')
+        await message.reply('Sorry. To prevent abuse, your server must be at ' +
+          'least one week old to use this bot')
+        clearInterval(typingInterval)
+        return
+      }
+
+      if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
+        if (guild.gpt4TokensAvailable <= 0) {
+          console.log(LOG_PREFIX + 'No tokens available for GPT-4')
+          await message.reply('Sorry, you have run out of GPT-4 tokens. `/tokens` to get more or ' +
+        '`/config` to switch to GPT-3')
+          clearInterval(typingInterval)
+          guild.gpt4TokensAvailable = 0
+          await guild.save()
+          return
+        }
       } else {
+        if (guild.gpt3TokensAvailable <= 0) {
+          console.log(LOG_PREFIX + 'No tokens available for GPT-3')
+          await message.reply('Sorry, you have run out of GPT-3 tokens. `/tokens` to get more')
+          guild.gpt3TokensAvailable = 0
+          clearInterval(typingInterval)
+          await guild.save()
+          return
+        }
+      }
+
+      console.log(LOG_PREFIX + 'Generating response...')
+
+      let response = await openAiHelper.createChatCompletion(
+        channel.messages.map((message) => message.chatCompletionRequestMessage),
+        channel.config.LANGUAGE_MODEL,
+        message.author.id
+      )
+
+      // subtract from the guild's token count
+      if (channel.config.LANGUAGE_MODEL.toLowerCase() === 'gpt-4') {
+        try {
+          await guild.subtractGpt4Tokens(channel.countTotalTokens())
+        } catch (error) {
+          console.error(error)
+          return
+        }
+      } else {
+        try {
+          await guild.subtractGpt3Tokens(channel.countTotalTokens())
+        } catch (error) {
+          console.error(error)
+          return
+        }
+      }
+
+      // let's ensure our own response doesn't violate any moderation
+      // rules
+      if ((await openAiHelper.findModerationIndices([response])).length > 0) {
+        console.log(LOG_PREFIX + 'Response flagged: ' + response)
+        clearInterval(typingInterval)
+        await message.reply(channel.config.MODERATION_VIOLATION)
+        return
+      }
+
+      const newMessage = new Message({
+        guildId: message.guildId,
+        channelId: message.channelId,
+        userId: client.user.id,
+        timestamp: Date.now(),
+        type: ChatCompletionRequestMessageRoleEnum.Assistant,
+        content: response,
+        chatCompletionRequestMessage: {
+          role: ChatCompletionRequestMessageRoleEnum.Assistant,
+          content: response,
+          name: client.user.id.toString()
+        }
+      })
+
+      await channel.addMessage(newMessage)
+
+      console.log(LOG_PREFIX + 'Response: ' + response)
+
+      // if this is the first assistant message, send the disclaimer first
+      if (!channel.disclaimerSent && channel.config.DISCLAIMER.length > 0) {
+        channel.setDisclaimerSent(true)
+        response = channel.config.DISCLAIMER + '\n\n' + response
+        console.log(LOG_PREFIX + 'Adding disclaimer')
+        await channel.save()
+      }
+
+      // if the message is too long, split it up into max of 2000
+      // characters per message
+      // split up the messsage into each 2000 character chunks
+      const chunks = response.match(/[\s\S]{1,2000}/g)
+      clearInterval(typingInterval)
+      for (const chunk of chunks ?? []) {
+      // if it was a mention, reply to the message
+        if (message.mentions.has(client.user)) {
+          await message.reply(chunk)
+        } else {
         // otherwise, send message to channel
         // (should only happen if ONLY_RESPOND_TO_MENTIONS = FALSE)
-        await message.channel.send(chunk)
+          await message.channel.send(chunk)
+        }
       }
+    } catch (e) {
+      console.log(e)
+      await message.reply(channel.config.ERROR_RESPONSE)
+    } finally {
+      clearInterval(typingInterval)
     }
   } catch (e) {
-    console.log(e)
-    await message.reply(channel.config.ERROR_RESPONSE)
-  } finally {
-    clearInterval(typingInterval)
+    console.error(e)
   }
 })
 
@@ -760,6 +774,9 @@ setInterval(() => {
 client
   .login(DISCORD_TOKEN)
   .then(async () => {
+    console.log(NTFY_TOPIC)
+    console.log('Sending notification to ntfy.sh')
+    await ntfy.publish('The server has started', 'Discord AI Bot Started', 'robot')
     console.log('Logged in!')
     // print how many servers we're in
     console.log(
@@ -769,6 +786,7 @@ client
   })
   .catch((e) => {
     console.error(e)
+    void ntfy.publish('The server has failed to start', 'Discord AI Bot Failed to Start', 'robot')
   })
 
 // add express endpoint to handle stripe payments
