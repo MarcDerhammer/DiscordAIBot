@@ -601,8 +601,6 @@ client.on(Events.MessageCreate, async (message) => {
 
     const channel = await guild.getChannel(message.channelId)
 
-    const LOG_PREFIX = `${message.guildId}:${message.channelId}:`
-
     if (channel == null) {
       if (message.mentions.users.has(client.user.id)) {
         log({

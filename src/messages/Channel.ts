@@ -54,19 +54,21 @@ export class Channel {
       log({
         guildId: this.guildId,
         channelId: this.id,
-        message: 'Removing message to avoid exceeding max token count'
+        message: 'Removing message to avoid exceeding max token count. current: ' +
+        `${this.countTotalTokens()}`
       })
       // remove the first non-system message
       const index = this.messages.findIndex(
         (message) =>
           message.chatCompletionRequestMessage.role !== ChatCompletionRequestMessageRoleEnum.System
       )
-      await this.messages[index].delete()
-      this.messages.splice(index, 1)
-      if (index === -1) {
-        // no non-system messages found.. but we still need to break to avoid loop
+      const message = this.messages[index]
+      if (message === undefined) {
         throw new Error('System messages are too long')
       }
+
+      void message.delete()
+      this.messages.splice(index, 1)
     }
   }
 
@@ -90,6 +92,13 @@ export class Channel {
       channelId: this.id,
       message: `Clearing messages of type ${role}`
     })
+    // now we need to delete all these messages from database too
+    const messages = this.messages.filter(
+      (message) => message.chatCompletionRequestMessage.role === role)
+    for (const message of messages) {
+      void message.delete()
+    }
+
     this.messages = [
       ...this.messages.filter((message) => message.chatCompletionRequestMessage.role !== role)
     ]
