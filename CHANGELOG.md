@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.13] - 2023-04-02
+
 ### Fixed
 
 -   Fixed `/reset` not deleting messages from the database
@@ -101,7 +103,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.12...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.13...HEAD
+
+[3.0.13]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.12...3.0.13
 
 [3.0.12]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.11...3.0.12
 
