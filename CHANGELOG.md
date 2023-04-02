@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.12] - 2023-04-02
+
+### Changed
+
+-   Changed `/tokens` command to add the pricing page
+
 ## [3.0.11] - 2023-04-02
 
 -   Log to mongo as well as console for easier parsing of logs
@@ -91,7 +97,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.11...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.12...HEAD
+
+[3.0.12]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.11...3.0.12
 
 [3.0.11]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.10...3.0.11
 
