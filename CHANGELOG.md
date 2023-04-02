@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+-   Log to mongo as well as console for easier parsing of logs
+
 ## [3.0.10] - 2023-04-02
 
 -   Lowered price of GPT-4 Tokens
