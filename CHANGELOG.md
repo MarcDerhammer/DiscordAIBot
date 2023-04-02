@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+-   Lowered price of GPT-4 Tokens
+
 ## [3.0.9] - 2023-04-01
+
+### Added
+
+-   ntfy.sh support
+
+### Fixed
+
+-   Bug with when a server didn't give the bot proper permissions was crashing the server
 
 ## [3.0.8] - 2023-04-01
 
