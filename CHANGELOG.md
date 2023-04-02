@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+-   Fixed `/reset` not deleting messages from the database
+
 ## [3.0.12] - 2023-04-02
 
 ### Changed
