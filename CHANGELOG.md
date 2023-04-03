@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+-   Fixed Stripe tax thing
+
+### Changed
+
+-   Increased price of GPT-4 tokens
+-   Added logging for payment webhook
+
 ## [3.0.17] - 2023-04-03
 
 ### Changed
