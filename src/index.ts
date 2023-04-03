@@ -266,7 +266,7 @@ commands.set('who', async (interaction) => {
   const messages =
       channel.messages.filter(
         (x) => x.chatCompletionRequestMessage.role === ChatCompletionResponseMessageRoleEnum.System)
-  const messageList = messages.map((m) => m.content).join('\n • ')
+  const messageList = messages.map((m) => m.content.slice(0, 500)).join('\n • ')
 
   const response = 'Channel configured with the following settings: \n' +
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -276,10 +276,10 @@ commands.set('who', async (interaction) => {
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     `\`IGNORE_EVERYONE_MENTIONS\`: ${channel.config.IGNORE_EVERYONE_MENTIONS}\n` +
     `\`LANGUAGE_MODEL\`: ${channel.config.LANGUAGE_MODEL}` +
-    `\n\nSystem messages: \n • ${messageList}`
-
+    `\n\nSystem messages (${messages.length}): \n • ${messageList}`
+  
   await interaction.reply({
-    content: response,
+    content: response.slice(0, 2000),
     ephemeral: true
   })
 })
@@ -502,8 +502,10 @@ commands.set('system', async (interaction) => {
       channel.messages.filter(
         (x) => x.chatCompletionRequestMessage.role === ChatCompletionResponseMessageRoleEnum.System)
     const messageList = messages.map((m) => m.content).join('\n • ')
+
+    const response = `System messages (${messages.length}): \n • ${messageList}`
     await interaction.reply({
-      content: `System messages: \n • ${messageList}`
+      content: response.slice(0, 2000),
     })
     return
   }
@@ -536,8 +538,9 @@ commands.set('system', async (interaction) => {
     channelId: interaction.channelId,
     message: `${interaction.user.id} Added system message: ${message}`
   })
+  const response = `System message added by <@${interaction.user.id}>: \n${message}`
   await interaction.reply({
-    content: `System message added by <@${interaction.user.id}>: \n${message}`
+    content: response.slice(0, 2000)
   })
 })
 
