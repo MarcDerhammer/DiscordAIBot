@@ -189,6 +189,9 @@ export default async function generateCheckout (
     payment_method_types: ['card', 'cashapp'],
     success_url: 'https://discordai.chat/payment',
     cancel_url: 'https://discordai.chat',
+    automatic_tax: {
+      enabled: true
+    },
     line_items: [
       {
         quantity: 1,
