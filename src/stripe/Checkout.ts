@@ -118,6 +118,22 @@ export async function handleWebHook (
       const scale = type === TOKEN_TYPE.GPT_3 ? GPT_3_UNIT_AMOUNT : GPT_4_UNIT_AMOUNT
       const totalToAdd = quantity * scale
 
+      const info = {
+        anonymous: anonymousValue,
+        userId,
+        channelId,
+        type,
+        tokens: totalToAdd,
+        previousBalanceGPT3: guild.gpt3TokensAvailable,
+        previousBalanceGPT4: guild.gpt4TokensAvailable
+      }
+
+      log({
+        message: JSON.stringify(info),
+        guildId,
+        channelId
+      })
+
       if (type === TOKEN_TYPE.GPT_3) {
         guild.gpt3TokensAvailable += totalToAdd
       } else {
@@ -125,6 +141,21 @@ export async function handleWebHook (
       }
       await guild.save()
 
+      const postInfo = {
+        anonymous: anonymousValue,
+        userId,
+        channelId,
+        type,
+        tokens: totalToAdd,
+        newBalanceGPT3: guild.gpt3TokensAvailable,
+        newBalanceGPT4: guild.gpt4TokensAvailable
+      }
+
+      log({
+        message: JSON.stringify(postInfo)
+      })
+
+      res.send('Success')
       const discordChannel = await client.channels.fetch(channelId)
 
       if (discordChannel instanceof TextChannel) {
@@ -136,7 +167,6 @@ export async function handleWebHook (
           `${totalToAdd.toLocaleString()} tokens for ${type ?? ''}!`)
         }
       }
-      res.send('Success')
     }
   } catch (err) {
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
