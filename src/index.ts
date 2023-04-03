@@ -501,7 +501,7 @@ commands.set('system', async (interaction) => {
     const messages =
       channel.messages.filter(
         (x) => x.chatCompletionRequestMessage.role === ChatCompletionResponseMessageRoleEnum.System)
-    const messageList = messages.map((m) => m.content).join('\n • ')
+    const messageList = messages.map((m) => m.content.slice(0, 500)).join('\n • ')
 
     const response = `System messages (${messages.length}): \n • ${messageList}`
     await interaction.reply({
