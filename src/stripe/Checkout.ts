@@ -5,7 +5,7 @@ import { type Client, TextChannel } from 'discord.js'
 import { log } from '../logger'
 
 const GPT_3_PRICE_PER_TOKEN = 0.003 / 1000
-const GPT_4_PRICE_PER_TOKEN = 0.035 / 1000
+const GPT_4_PRICE_PER_TOKEN = 0.05 / 1000
 
 const GPT_3_UNIT_AMOUNT = 1000000
 const GPT_4_UNIT_AMOUNT = 100000
@@ -201,6 +201,7 @@ export default async function generateCheckout (
           maximum: 50
         },
         price_data: {
+          tax_behavior: 'exclusive',
           currency: 'usd',
           product_data: {
             name: `${SHORT_FORMAT_NUMBER} ${type} Tokens`,
