@@ -676,17 +676,28 @@ client.on(Events.MessageCreate, async (message) => {
 
     try {
       // ensure the message is appropriate
-      const badIndices = await openAiHelper.findModerationIndices(
+      const badMessages = await openAiHelper.findFlaggedMessages(
         channel.messages.map((message) => message.content)
       )
 
-      if (badIndices.length > 0) {
-      // remove any messages that were flagged
-        badIndices
-          .sort((a, b) => b - a)
-          .forEach((index) => {
-            channel.messages.splice(index, 1)
-          })
+      if (badMessages.length > 0) {
+        // remove any messages that were flagged
+        badMessages.forEach((badMessage) => {
+          const message = channel.messages.find((message) => message.content === badMessage)
+          if (message != null) {
+            log({
+              guildId: message.guildId,
+              channelId: message.channelId,
+              message: `Message flagged as inappropriate: ${message.content}`
+            })
+            void message.delete()
+          }
+        })
+
+        channel.messages = channel.messages.filter(
+          (message) => !badMessages.includes(message.content)
+        )
+
         clearInterval(typingInterval)
         await message.reply(channel.config.MODERATION_VIOLATION)
         log({
@@ -781,7 +792,7 @@ client.on(Events.MessageCreate, async (message) => {
 
       // let's ensure our own response doesn't violate any moderation
       // rules
-      if ((await openAiHelper.findModerationIndices([response])).length > 0) {
+      if ((await openAiHelper.findFlaggedMessages([response])).length > 0) {
         log({
           guildId: message.guildId,
           channelId: message.channelId,

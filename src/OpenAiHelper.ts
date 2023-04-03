@@ -16,7 +16,7 @@ export class OpenAiHelper {
    * @param messages the messages to check for moderation violations
    * @returns the indices of the messages that are inappropriate
    */
-  async findModerationIndices (messages: string[]): Promise<number[]> {
+  async findFlaggedMessages (messages: string[]): Promise<string[]> {
     const moderation = await this.openai.createModeration({ input: messages })
     if (moderation.status !== 200) {
       throw new Error(
@@ -24,16 +24,16 @@ export class OpenAiHelper {
       )
     }
 
-    // find the indices of the messages that are inappropriate
-    const flaggedIndices = moderation.data.results
+    // find the strings of the messages that are inappropriate
+    const flaggedStrings = moderation.data.results
       .map((result, index) => {
         if (result.flagged) {
-          return index
+          return messages[index]
         }
-        return -1
+        return ''
       })
-      .filter(index => index !== -1)
-    return flaggedIndices
+      .filter(index => index !== '')
+    return flaggedStrings
   }
 
   async createChatCompletion (
