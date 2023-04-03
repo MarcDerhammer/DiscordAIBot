@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.17] - 2023-04-03
+
+### Changed
+
+-   Enable Stripe Taax
+
 ## [3.0.16] - 2023-04-03
 
 ### Changed
@@ -122,7 +128,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.16...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.17...HEAD
+
+[3.0.17]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.16...3.0.17
 
 [3.0.16]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.15...3.0.16
 
