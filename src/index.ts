@@ -11,7 +11,7 @@ import {
 } from 'discord.js'
 import { getEnv } from './env'
 
-import { countTokens, OpenAiHelper } from './OpenAiHelper'
+import { OpenAiHelper } from './OpenAiHelper'
 import { DEFAULT_GUILD_CONFIG, Guild } from './messages/Guild'
 import { type ChannelConfig } from './messages/ChannelConfig'
 import { Channel } from './messages/Channel'
@@ -516,6 +516,22 @@ commands.set('system', async (interaction) => {
     })
     return
   }
+
+  // wait for moderation check
+  const moderationCheck = await openAiHelper.findFlaggedMessages([message])
+  if (moderationCheck.length > 0) {
+    log({
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      message: `${interaction.user.id} Tried to add system message: ${message} but it was flagged`
+    })
+    await interaction.reply({
+      content: 'This message was flagged by the moderation system.',
+      ephemeral: true
+    })
+    return
+  }
+
   const systemMessage = {
     content: message,
     role: ChatCompletionResponseMessageRoleEnum.System,
@@ -799,7 +815,7 @@ client.on(Events.MessageCreate, async (message) => {
         log({
           guildId: message.guildId,
           channelId: message.channelId,
-          message: 'Moderation violation (from our own response...)'
+          message: 'Moderation violation (from our own response...): ' + response
         })
         clearInterval(typingInterval)
         await message.reply(channel.config.MODERATION_VIOLATION)
