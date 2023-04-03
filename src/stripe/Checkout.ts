@@ -5,7 +5,7 @@ import { type Client, TextChannel } from 'discord.js'
 import { log } from '../logger'
 
 const GPT_3_PRICE_PER_TOKEN = 0.003 / 1000
-const GPT_4_PRICE_PER_TOKEN = 0.035 / 1000
+const GPT_4_PRICE_PER_TOKEN = 0.05 / 1000
 
 const GPT_3_UNIT_AMOUNT = 1000000
 const GPT_4_UNIT_AMOUNT = 100000
@@ -118,6 +118,22 @@ export async function handleWebHook (
       const scale = type === TOKEN_TYPE.GPT_3 ? GPT_3_UNIT_AMOUNT : GPT_4_UNIT_AMOUNT
       const totalToAdd = quantity * scale
 
+      const info = {
+        anonymous: anonymousValue,
+        userId,
+        channelId,
+        type,
+        tokens: totalToAdd,
+        previousBalanceGPT3: guild.gpt3TokensAvailable,
+        previousBalanceGPT4: guild.gpt4TokensAvailable
+      }
+
+      log({
+        message: JSON.stringify(info),
+        guildId,
+        channelId
+      })
+
       if (type === TOKEN_TYPE.GPT_3) {
         guild.gpt3TokensAvailable += totalToAdd
       } else {
@@ -125,6 +141,21 @@ export async function handleWebHook (
       }
       await guild.save()
 
+      const postInfo = {
+        anonymous: anonymousValue,
+        userId,
+        channelId,
+        type,
+        tokens: totalToAdd,
+        newBalanceGPT3: guild.gpt3TokensAvailable,
+        newBalanceGPT4: guild.gpt4TokensAvailable
+      }
+
+      log({
+        message: JSON.stringify(postInfo)
+      })
+
+      res.send('Success')
       const discordChannel = await client.channels.fetch(channelId)
 
       if (discordChannel instanceof TextChannel) {
@@ -136,7 +167,6 @@ export async function handleWebHook (
           `${totalToAdd.toLocaleString()} tokens for ${type ?? ''}!`)
         }
       }
-      res.send('Success')
     }
   } catch (err) {
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -201,6 +231,7 @@ export default async function generateCheckout (
           maximum: 50
         },
         price_data: {
+          tax_behavior: 'exclusive',
           currency: 'usd',
           product_data: {
             name: `${SHORT_FORMAT_NUMBER} ${type} Tokens`,
