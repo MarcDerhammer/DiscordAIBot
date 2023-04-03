@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+-   Enable Stripe Taax
+
 ## [3.0.16] - 2023-04-03
 
 ### Changed
