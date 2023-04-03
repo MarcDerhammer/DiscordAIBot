@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.18] - 2023-04-03
+
 ### Fixed
 
 -   Fixed Stripe tax thing
@@ -137,7 +139,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.17...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.18...HEAD
+
+[3.0.18]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.17...3.0.18
 
 [3.0.17]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.16...3.0.17
 
