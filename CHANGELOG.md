@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+-   Super long system messages get trimmed so Discord doesn't blow up on respones
+
 ## [3.0.14] - 2023-04-03
 
 ### Fixed
