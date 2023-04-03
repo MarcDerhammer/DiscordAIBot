@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.15] - 2023-04-03
+
+### Fixed
+
+-   Super long system messages get trimmed so Discord doesn't blow up on respones
+
 ## [3.0.14] - 2023-04-03
 
 ### Fixed
@@ -110,7 +116,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.14...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.15...HEAD
+
+[3.0.15]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.14...3.0.15
 
 [3.0.14]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.13...3.0.14
 
