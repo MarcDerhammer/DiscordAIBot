@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+-   Refactored message to process in another file
+-   Messages are queued per channel instead of firing at once to help avoid rate limiting
+
 ## [3.0.18] - 2023-04-03
 
 ### Fixed
