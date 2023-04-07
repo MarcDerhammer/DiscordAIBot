@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+-  Auto leave young servers
+-  Added admin post to force leave a server
+
 ### Fixed
 
 -  Catch an error in replying (during an error caught response to command)

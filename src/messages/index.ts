@@ -178,7 +178,8 @@ async function processMessage (message: Message): Promise<void> {
           message: 'Server is less than one week old, ignoring message'
         })
         await message.reply('Sorry. To prevent abuse, your server must be at ' +
-              'least one week old to use this bot')
+              'least one week old to use this bot. Leaving server...')
+        await message.guild?.leave()
         clearInterval(typingInterval)
         return
       }
