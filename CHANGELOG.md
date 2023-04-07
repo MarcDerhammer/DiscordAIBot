@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2023-04-07
+
+### Fixed
+
+-   Catch an error in replying (during an error caught response to command)
+
 ## [3.1.0] - 2023-04-05
 
 ### Changed
@@ -146,7 +152,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.0...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.1...HEAD
+
+[3.1.1]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.0...3.1.1
 
 [3.1.0]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.0.18...3.1.0
 
