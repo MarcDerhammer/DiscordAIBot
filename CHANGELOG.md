@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
--  Auto leave young servers
--  Added admin post to force leave a server
+## [3.1.2] - 2023-04-07
+
+-   Auto leave young servers
+-   Added admin post to force leave a server
 
 ## [3.1.1] - 2023-04-07
 
@@ -155,7 +157,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.1...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.2...HEAD
+
+[3.1.2]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.1...3.1.2
 
 [3.1.1]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.0...3.1.1
 
