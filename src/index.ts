@@ -220,6 +220,41 @@ app.post('/admin', async (req, res) => {
   }
 })
 
+// eslint-disable-next-line @typescript-eslint/no-misused-promises
+app.post('/leave', async (req, res) => {
+  try {
+    if (ADMIN_API_KEY == null || ADMIN_API_KEY.length === 0) {
+      res.status(401).send('Unauthorized')
+      return
+    }
+    const apiKey = req.headers['api-key']
+
+    if (apiKey === null || apiKey === undefined || apiKey !== ADMIN_API_KEY) {
+      res.status(401).send('Unauthorized')
+      return
+    }
+
+    const guildId = req.body.guildId
+    // leave the guild
+    if (guildId == null) {
+      res.status(400).send('GuildId is required')
+      return
+    }
+    await client.guilds.cache.get(guildId as string)?.leave()
+    log({
+      guildId: guildId as string,
+      message: `/leave POST left guild ${guildId as string}`
+    })
+    res.send('ok')
+  } catch (e) {
+    log({
+      message: e,
+      level: 'error'
+    })
+    res.status(500).send('Internal Server Error')
+  }
+})
+
 client.once(Events.ClientReady, async () => {
   log({
     message: 'Bot is ready ready!',
