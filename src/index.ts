@@ -584,10 +584,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
         channelId: interaction.channelId,
         message: `Error processing command ${interaction.commandName}: ${error as string}`
       })
-      await interaction.reply({
-        content: 'An error occurred while processing this command',
-        ephemeral: true
-      })
+      try {
+        await interaction.reply({
+          content: 'An error occurred while processing this command',
+          ephemeral: true
+        })
+      } catch (e) {
+        log({
+          guildId: interaction.guildId ?? undefined,
+          channelId: interaction.channelId,
+          message: `Error replying to command ${interaction.commandName}: ${e as string}`
+        })
+      }
     }
   }
 })
