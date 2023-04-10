@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2023-04-10
+
 ### Changed
--  Encrypt all messages and logs
--  Refactored the message schema to be simpler
+
+-   Encrypt all messages and logs
+-   Refactored the message schema to be simpler
 
 ## [3.1.4] - 2023-04-10
 
@@ -183,7 +186,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.4...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.2.0...HEAD
+
+[3.2.0]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.4...3.2.0
 
 [3.1.4]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.3...3.1.4
 
