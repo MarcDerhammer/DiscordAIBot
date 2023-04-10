@@ -41,12 +41,6 @@ async function processMessage (message: Message): Promise<void> {
     if (client.user?.id == null || message.channelId == null) return
     if (message.author.id === client.user.id) return
 
-    log({
-      guildId: message.guildId,
-      channelId: message.channelId,
-      message: `${message.author.username}: ${message.content}`
-    })
-
     let guild = guilds.get(message.guildId)
     if (guild == null) {
       log({
@@ -75,6 +69,13 @@ async function processMessage (message: Message): Promise<void> {
       }
       return
     }
+
+    log({
+      guildId: message.guildId,
+      channelId: message.channelId,
+      userId: message.author.id,
+      message: `${message.author.username}: ${message.content}`
+    })
 
     const newMessage = new MyMessage({
       id: message.id,

@@ -597,11 +597,15 @@ commands.set('system', async (interaction) => {
 commands.set('help', async (interaction) => {
   await interaction.reply({
     content: 'Commands: \n' +
+      '`/who    `Gets information about the bot\'s configuration in this channel\n' +
       '`/tokens `Check how many tokens this server has left and links to buy more \n' +
       '`/config `Configure the bot for this channel (Admin only) \n' +
       '`/reset  `Reset the bot for this channel (Admin only)\n' +
       '`/system `Add a system message to the bot (Admin only) \n' +
-      '`/help   `Show this message',
+      '`/help   `Show this message' +
+      '\n\nRead more on the [website](https://discordai.chat)' +
+      '\n\nFor help, please join the ' +
+      '[support server](https://discord.gg/b8FKqtjRX5)',
     ephemeral: true
   })
 })

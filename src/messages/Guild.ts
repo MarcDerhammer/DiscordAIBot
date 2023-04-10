@@ -49,11 +49,6 @@ export class Guild {
 
   async getChannel (id: string): Promise<Channel | undefined> {
     if (!this.channels.has(id)) {
-      log({
-        guildId: this.id,
-        channelId: id,
-        message: 'Channel not found'
-      })
       return undefined
     }
     return this.channels.get(id)
