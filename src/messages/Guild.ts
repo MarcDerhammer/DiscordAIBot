@@ -16,8 +16,8 @@ export const DEFAULT_GUILD_CONFIG: ChannelConfig = {
   LANGUAGE_MODEL: 'gpt-3.5-turbo'
 }
 
-const GPT3_TOKENS_AVAILABLE = 1000000
-const GPT4_TOKENS_AVAILABLE = 60000
+const GPT3_TOKENS_AVAILABLE = 500000
+const GPT4_TOKENS_AVAILABLE = 30000
 
 const isRunningInDocker = (): boolean => {
   return fs.existsSync('/.dockerenv')
