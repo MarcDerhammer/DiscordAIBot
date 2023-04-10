@@ -6,14 +6,16 @@ export class LogEntry {
   channelId?: string
   message: string
   level: 'info' | 'warn' | 'error' = 'info'
+  userId?: string
 
   constructor (message: string, guildId?: string, channelId?: string,
-    level?: 'info' | 'warn' | 'error') {
+    level?: 'info' | 'warn' | 'error', userId?: string) {
     this.timestamp = new Date()
     this.message = message
     this.guildId = guildId
     this.channelId = channelId
     this.level = level ?? 'info'
+    this.userId = userId
   }
 
   async save (): Promise<void> {

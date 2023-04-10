@@ -7,13 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.4] - 2023-04-10
+
+### Changed
+
+-   Turn off the "ignore everyone mentions" config since nobody uses it
+
+### Fixed
+
+-   Added the who command and more info to help
+-   Only log messages if channel is configured
+
 ## [3.1.3] - 2023-04-10
+
+### Changed
 
 -   Reduce initial values
 
 ## [3.1.2] - 2023-04-07
 
+### Changed
+
 -   Auto leave young servers
+
+### Added
+
 -   Added admin post to force leave a server
 
 ## [3.1.1] - 2023-04-07
@@ -161,7 +179,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.3...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.4...HEAD
+
+[3.1.4]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.3...3.1.4
 
 [3.1.3]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.1.2...3.1.3
 
