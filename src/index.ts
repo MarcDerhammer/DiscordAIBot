@@ -308,7 +308,7 @@ commands.set('who', async (interaction) => {
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     // `\`IGNORE_BOTS\`: ${channel.config.IGNORE_BOTS}\n` +
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    `\`IGNORE_EVERYONE_MENTIONS\`: ${channel.config.IGNORE_EVERYONE_MENTIONS}\n` +
+    // `\`IGNORE_EVERYONE_MENTIONS\`: ${channel.config.IGNORE_EVERYONE_MENTIONS}\n` +
     `\`LANGUAGE_MODEL\`: ${channel.config.LANGUAGE_MODEL}` +
     `\n\nSystem messages (${messages.length}): \n • ${messageList}`
 
@@ -384,7 +384,7 @@ commands.set('config', async (interaction) => {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       // `\`IGNORE_BOTS\`: ${channel.config.IGNORE_BOTS}\n` +
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      `\`IGNORE_EVERYONE_MENTIONS\`: ${channel.config.IGNORE_EVERYONE_MENTIONS}\n` +
+      // `\`IGNORE_EVERYONE_MENTIONS\`: ${channel.config.IGNORE_EVERYONE_MENTIONS}\n` +
       `\`LANGUAGE_MODEL\`: ${channel.config.LANGUAGE_MODEL}`
   })
 })

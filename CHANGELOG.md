@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+-   Turn off the "ignore everyone mentions" config since nobody uses it
+
 ### Fixed
 -   Added the who command and more info to help
 -   Only log messages if channel is configured

@@ -57,12 +57,12 @@ export default async (client: Client<boolean>): Promise<void> => {
         //   type: ApplicationCommandOptionType.Boolean,
         //   required: true
         // },
-        {
-          name: 'ignore_everyone_mentions',
-          description: 'Ignore @everyone and @here (default: true)',
-          type: ApplicationCommandOptionType.Boolean,
-          required: true
-        },
+        // {
+        //   name: 'ignore_everyone_mentions',
+        //   description: 'Ignore @everyone and @here (default: true)',
+        //   type: ApplicationCommandOptionType.Boolean,
+        //   required: true
+        // },
         {
           name: 'language_model',
           description: 'Which language model to use (default: GPT-3.5 Turbo) GPT-4 is ' +

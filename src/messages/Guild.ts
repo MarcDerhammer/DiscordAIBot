@@ -4,7 +4,6 @@ import { type ChannelConfig } from './ChannelConfig'
 import fs from 'fs'
 import { DEFAULT_MODERATION_VIOATION_RESPONSE, DISCLAIMER } from '../env'
 import { mongoClient } from '../mongo/MongoClient'
-import { log } from '../logger'
 
 export const DEFAULT_GUILD_CONFIG: ChannelConfig = {
   ERROR_RESPONSE: 'Sorry, there was an error. Please try again later.',
