@@ -23,6 +23,7 @@ import { mongoClient } from './mongo/MongoClient'
 import { Ntfy } from './ntfy/Ntfy'
 import { log } from './logger'
 import { queueMessage } from './messages/index'
+import Encryption from './messages/Crypto'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
@@ -30,6 +31,8 @@ const ADMIN_API_KEY = getEnv('ADMIN_API_KEY')
 const NTFY_TOPIC = getEnv('NTFY_TOPIC')
 
 export const ntfy = new Ntfy(NTFY_TOPIC)
+
+export const enc = new Encryption(getEnv('ENCRYPTION_KEY'))
 
 export const openAiHelper = new OpenAiHelper(
   new OpenAIApi(
@@ -93,11 +96,10 @@ export const guilds = new Map<string, Guild>();
           id: messageDoc.id,
           guildId: messageDoc.guildId,
           channelId: messageDoc.channelId,
-          userId: messageDoc.userId,
+          user: messageDoc.user ?? messageDoc.userId,
           content: messageDoc.content,
           timestamp: messageDoc.timestamp,
-          type: messageDoc.type,
-          chatCompletionRequestMessage: messageDoc.chatCompletionRequestMessage
+          role: messageDoc.role ?? messageDoc.type
         })
         channel.messages.push(message)
       }
@@ -299,7 +301,7 @@ commands.set('who', async (interaction) => {
 
   const messages =
       channel.messages.filter(
-        (x) => x.chatCompletionRequestMessage.role === ChatCompletionResponseMessageRoleEnum.System)
+        (x) => x.role === ChatCompletionResponseMessageRoleEnum.System)
   const messageList = messages.map((m) => m.content.slice(0, 500)).join('\n • ')
 
   const response = 'Channel configured with the following settings: \n' +
@@ -534,7 +536,7 @@ commands.set('system', async (interaction) => {
   if (list) {
     const messages =
       channel.messages.filter(
-        (x) => x.chatCompletionRequestMessage.role === ChatCompletionResponseMessageRoleEnum.System)
+        (x) => x.role === ChatCompletionResponseMessageRoleEnum.System)
     const messageList = messages.map((m) => m.content.slice(0, 500)).join('\n • ')
 
     const response = `System messages (${messages.length}): \n • ${messageList}`
@@ -566,20 +568,13 @@ commands.set('system', async (interaction) => {
     return
   }
 
-  const systemMessage = {
-    content: message,
-    role: ChatCompletionResponseMessageRoleEnum.System,
-    name: client.user?.id
-  }
-
   const newMessage = new Message({
     guildId: interaction.guildId,
     channelId: interaction.channelId,
     content: message,
     timestamp: interaction.createdTimestamp,
-    type: ChatCompletionResponseMessageRoleEnum.System,
-    userId: client.user?.id ?? '',
-    chatCompletionRequestMessage: systemMessage
+    role: ChatCompletionResponseMessageRoleEnum.System,
+    user: client.user?.id ?? ''
   })
 
   await channel.addMessage(newMessage)

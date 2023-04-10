@@ -81,15 +81,10 @@ async function processMessage (message: Message): Promise<void> {
       id: message.id,
       guildId: message.guildId,
       channelId: message.channelId,
-      userId: message.author.id,
+      user: message.author.id,
       timestamp: message.createdTimestamp,
-      type: ChatCompletionRequestMessageRoleEnum.User,
-      content: message.content,
-      chatCompletionRequestMessage: {
-        role: ChatCompletionRequestMessageRoleEnum.User,
-        content: message.content,
-        name: message.author.id.toString()
-      }
+      role: ChatCompletionRequestMessageRoleEnum.User,
+      content: message.content
     })
 
     await channel.addMessage(newMessage)
@@ -221,7 +216,11 @@ async function processMessage (message: Message): Promise<void> {
       })
 
       let response = await openAiHelper.createChatCompletion(
-        channel.messages.map((message) => message.chatCompletionRequestMessage),
+        channel.messages.map((message) => ({
+          role: message.role,
+          content: message.content,
+          name: message.user
+        })),
         channel.config.LANGUAGE_MODEL,
         message.author.id
       )
@@ -269,15 +268,10 @@ async function processMessage (message: Message): Promise<void> {
       const newMessage = new MyMessage({
         guildId: message.guildId,
         channelId: message.channelId,
-        userId: client.user.id,
+        user: client.user.id,
         timestamp: Date.now(),
-        type: ChatCompletionRequestMessageRoleEnum.Assistant,
-        content: response,
-        chatCompletionRequestMessage: {
-          role: ChatCompletionRequestMessageRoleEnum.Assistant,
-          content: response,
-          name: client.user.id.toString()
-        }
+        role: ChatCompletionRequestMessageRoleEnum.Assistant,
+        content: response
       })
 
       await channel.addMessage(newMessage)

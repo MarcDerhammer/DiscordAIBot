@@ -40,7 +40,11 @@ export class Channel {
   }
 
   countTotalTokens (): number {
-    return countTokens(this.messages.map((message) => message.chatCompletionRequestMessage))
+    return countTokens(this.messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+      name: message.user
+    })))
   }
 
   async addMessage (message: Message): Promise<void> {
@@ -60,7 +64,7 @@ export class Channel {
       // remove the first non-system message
       const index = this.messages.findIndex(
         (message) =>
-          message.chatCompletionRequestMessage.role !== ChatCompletionRequestMessageRoleEnum.System
+          message.role !== ChatCompletionRequestMessageRoleEnum.System
       )
       const message = this.messages[index]
       if (message === undefined) {
@@ -94,13 +98,13 @@ export class Channel {
     })
     // now we need to delete all these messages from database too
     const messages = this.messages.filter(
-      (message) => message.chatCompletionRequestMessage.role === role)
+      (message) => message.role === role)
     for (const message of messages) {
       void message.delete()
     }
 
     this.messages = [
-      ...this.messages.filter((message) => message.chatCompletionRequestMessage.role !== role)
+      ...this.messages.filter((message) => message.role !== role)
     ]
   }
 
