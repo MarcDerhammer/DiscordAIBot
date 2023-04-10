@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+-  Reduce initial values
+
 ## [3.1.2] - 2023-04-07
 
 -   Auto leave young servers
