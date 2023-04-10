@@ -16,6 +16,7 @@ type EnvConfig = Record<string, string | undefined>
 interface RequiredEnv {
   API_KEY: string
   DISCORD_TOKEN: string
+  ENCRYPTION_KEY: string
 }
 
 interface OptionalEnv {
@@ -33,7 +34,8 @@ const env: EnvConfig = {
   DISCORD_TOKEN: process.env.DISCORD_TOKEN,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   ADMIN_API_KEY: process.env.ADMIN_API_KEY,
-  NTFY_TOPIC: process.env.NTFY_TOPIC
+  NTFY_TOPIC: process.env.NTFY_TOPIC,
+  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY
 }
 
 function isRequiredEnv (key: keyof Env): key is keyof RequiredEnv {
