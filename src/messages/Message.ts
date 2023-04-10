@@ -3,6 +3,7 @@ import {
 } from 'openai'
 import { mongoClient } from '../mongo/MongoClient'
 import { countTokens } from '../OpenAiHelper'
+import { enc } from '../index'
 
 export class Message {
   id: string
@@ -47,7 +48,13 @@ export class Message {
 
   async save (): Promise<void> {
     const messagesCollection = mongoClient.db('discord').collection('messages')
-    await messagesCollection.insertOne(this)
+
+    // instead of saving the object as is, replace the content field as its encrypted version
+    const encryptedMessage = {
+      ...this,
+      content: enc.encrypt(this.content)
+    }
+    await messagesCollection.insertOne(encryptedMessage)
   }
 
   async delete (): Promise<void> {

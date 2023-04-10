@@ -1,14 +1,13 @@
 import crypto from 'crypto'
 
+export const PREFIX = 'DAI.CHAT:'
 class Encryption {
-  private static readonly PREFIX = 'DAI.CHAT:'
+  private static readonly PREFIX = PREFIX
   private static readonly ALGORITHM = 'aes-256-cbc'
   private readonly key: Buffer
-  private readonly iv: Buffer
 
   constructor (secret: string) {
     this.key = crypto.createHash('sha256').update(secret).digest()
-    this.iv = crypto.randomBytes(16)
   }
 
   encrypt (text: string): string {
@@ -16,7 +15,8 @@ class Encryption {
       return text
     }
 
-    const cipher = crypto.createCipheriv(Encryption.ALGORITHM, this.key, this.iv)
+    const iv = crypto.randomBytes(16)
+    const cipher = crypto.createCipheriv(Encryption.ALGORITHM, this.key, iv)
     const encrypted = Buffer.concat([
       cipher.update(text, 'utf8'),
       cipher.final()
@@ -24,7 +24,7 @@ class Encryption {
 
     return (
       Encryption.PREFIX +
-      this.iv.toString('hex') +
+      iv.toString('hex') +
       ':' +
       encrypted.toString('hex')
     )

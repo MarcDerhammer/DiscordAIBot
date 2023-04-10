@@ -7,6 +7,7 @@
 // - channel
 
 import { LogEntry } from './LogEntry'
+import { enc } from '../index'
 
 export const log = ({ message, guildId, channelId, level, userId }:
 {
@@ -18,8 +19,11 @@ export const log = ({ message, guildId, channelId, level, userId }:
 }
 ): void => {
   // print to console
-  console.log(`${guildId ?? '<missing guild>'}:${channelId ?? '<missing channel>'}: ${message}`)
+  const encrypted = enc.encrypt(
+    `${guildId ?? '<missing guild>'}:${channelId ?? '<missing channel>'}: ${message}`
+  )
+  console.log(encrypted)
   // store in database
-  const logEntry = new LogEntry(message, guildId, channelId, level, userId)
+  const logEntry = new LogEntry(enc.encrypt(message), guildId, channelId, level, userId)
   void logEntry.save()
 }

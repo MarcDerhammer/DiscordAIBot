@@ -23,7 +23,7 @@ import { mongoClient } from './mongo/MongoClient'
 import { Ntfy } from './ntfy/Ntfy'
 import { log } from './logger'
 import { queueMessage } from './messages/index'
-import Encryption from './messages/Crypto'
+import Encryption, { PREFIX } from './messages/Crypto'
 
 const API_KEY = getEnv('API_KEY')
 const DISCORD_TOKEN = getEnv('DISCORD_TOKEN')
@@ -92,12 +92,23 @@ export const guilds = new Map<string, Guild>();
 
       // Process the messages as needed
       for (const messageDoc of messagesDocs) {
+        // if the content is not encrypted, encrypt it
+        if (messageDoc.content !== undefined) {
+          const existingContent = messageDoc.content as string
+          if (!existingContent.startsWith(PREFIX)) {
+            const encrypted = enc.encrypt(existingContent)
+            await messagesCollection.updateOne(
+              { id: messageDoc.id },
+              { $set: { content: encrypted } }
+            )
+          }
+        }
         const message = new Message({
           id: messageDoc.id,
           guildId: messageDoc.guildId,
           channelId: messageDoc.channelId,
           user: messageDoc.user ?? messageDoc.userId,
-          content: messageDoc.content,
+          content: enc.decrypt(messageDoc.content),
           timestamp: messageDoc.timestamp,
           role: messageDoc.role ?? messageDoc.type
         })
