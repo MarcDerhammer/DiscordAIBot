@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+-   Reduced initial token count
+
 ## [3.2.0] - 2023-04-10
 
 ### Changed
