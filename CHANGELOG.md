@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+-   No more ability to buy tokens.  I'll be shutting this down soon and refunding any purchases.
+
 ## [3.2.2] - 2023-04-28
 
 -   Reduced initial token count again
