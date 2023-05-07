@@ -84,7 +84,7 @@ export default async (client: Client<boolean>): Promise<void> => {
     },
     {
       name: 'tokens',
-      description: 'Check how many tokens are available and buy more'
+      description: 'Check how many tokens are available'
     },
     {
       name: 'who',

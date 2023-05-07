@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.3] - 2023-05-07
+
+### Changed
+
+-   No more ability to buy tokens.  I'll be shutting this down soon and refunding any purchases.
+
 ## [3.2.2] - 2023-04-28
 
 -   Reduced initial token count again
@@ -200,7 +206,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.2.2...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.2.3...HEAD
+
+[3.2.3]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.2.2...3.2.3
 
 [3.2.2]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.2.1...3.2.2
 

@@ -187,8 +187,7 @@ async function processMessage (message: Message): Promise<void> {
             channelId: message.channelId,
             message: 'No tokens available for GPT-4'
           })
-          await message.reply('Sorry, you have run out of GPT-4 tokens. `/tokens` to get more or ' +
-            '`/config` to switch to GPT-3')
+          await message.reply('Sorry, you have run out of GPT-4 tokens.')
           clearInterval(typingInterval)
           guild.gpt4TokensAvailable = 0
           await guild.save()
@@ -201,7 +200,7 @@ async function processMessage (message: Message): Promise<void> {
             channelId: message.channelId,
             message: 'No tokens available for GPT-3'
           })
-          await message.reply('Sorry, you have run out of GPT-3 tokens. `/tokens` to get more')
+          await message.reply('Sorry, you have run out of GPT-3 tokens')
           guild.gpt3TokensAvailable = 0
           clearInterval(typingInterval)
           await guild.save()
