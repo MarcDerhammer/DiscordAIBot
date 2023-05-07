@@ -427,27 +427,28 @@ commands.set('tokens', async (interaction) => {
   const gpt3Tokens = guild.gpt3TokensAvailable.toLocaleString()
   const gpt4Tokens = guild.gpt4TokensAvailable.toLocaleString()
 
-  const gpt3checkout = await generateCheckout(
-    interaction.guildId,
-    interaction.guild?.name ?? '',
-    interaction.user.id,
-    interaction.channelId,
-    TOKEN_TYPE.GPT_3
-  )
+  // const gpt3checkout = await generateCheckout(
+  //   interaction.guildId,
+  //   interaction.guild?.name ?? '',
+  //   interaction.user.id,
+  //   interaction.channelId,
+  //   TOKEN_TYPE.GPT_3
+  // )
 
-  const gpt4checkout = await generateCheckout(
-    interaction.guildId,
-    interaction.guild?.name ?? '',
-    interaction.user.id,
-    interaction.channelId,
-    TOKEN_TYPE.GPT_4
-  )
+  // const gpt4checkout = await generateCheckout(
+  //   interaction.guildId,
+  //   interaction.guild?.name ?? '',
+  //   interaction.user.id,
+  //   interaction.channelId,
+  //   TOKEN_TYPE.GPT_4
+  // )
 
   await interaction.reply({
     content: `Tokens Remaining: \n\`GPT-3: ${gpt3Tokens}\`` +
-      `\n\`GPT-4: ${gpt4Tokens}\`\n\nBuy more: [GPT-3](${gpt3checkout}) - ` +
-      `[GPT-4](${gpt4checkout})\n` +
-      '\n[Pricing](https://discordai.chat/pricing)\n' +
+      `\n\`GPT-4: ${gpt4Tokens}\`\n\nSorry, but there is no way to buy more.` +
+      'I\'ve been bleeding money and will be shutting this bot down soon and refunding any ' +
+      'previous ' +
+      'purchases\n' +
       'Note: GPT-4 is more powerful, but also more expensive.  Tokens are shared with the entire ' +
       'server.\n\n' +
       '[What\'s a token?]' +
@@ -604,7 +605,7 @@ commands.set('help', async (interaction) => {
   await interaction.reply({
     content: 'Commands: \n' +
       '`/who    `Gets information about the bot\'s configuration in this channel\n' +
-      '`/tokens `Check how many tokens this server has left and links to buy more \n' +
+      '`/tokens `Check how many tokens this server has left \n' +
       '`/config `Configure the bot for this channel (Admin only) \n' +
       '`/reset  `Reset the bot for this channel (Admin only)\n' +
       '`/system `Add a system message to the bot (Admin only) \n' +
