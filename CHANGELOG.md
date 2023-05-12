@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.4] - 2023-05-12
+
 ## [3.2.3] - 2023-05-07
 
 ### Changed
@@ -206,7 +208,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial Release (sort of)
 
-[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.2.3...HEAD
+[Unreleased]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.2.4...HEAD
+
+[3.2.4]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.2.3...3.2.4
 
 [3.2.3]: https://github.com/MarcDerhammer/DiscordAIBot/compare/3.2.2...3.2.3
 
